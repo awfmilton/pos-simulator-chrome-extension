@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Peripheral Simulator</title>
+    <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+    <div class="simulator-container">
+        <header class="header">
+            <h1>🏪 POS Peripheral Simulator</h1>
+            <div class="status-bar">
+                <span class="status-indicator online" id="status-indicator"></span>
+                <span id="status-text">System Ready</span>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="scanner">
+                📱 Scanner
+            </button>
+            <button class="tab-btn" data-tab="msr">
+                💳 MSR
+            </button>
+            <button class="tab-btn" data-tab="printer">
+                🖨️ Printer
+            </button>
+            <button class="tab-btn" data-tab="drawer">
+                💰 Drawer
+            </button>
+            <button class="tab-btn" data-tab="scale">
+                ⚖️ Scale
+            </button>
+            <button class="tab-btn" data-tab="display">
+                🖥️ Display
+            </button>
+        </nav>
+
+        <!-- Tab Panels -->
+        <div class="tab-panels">
+            <!-- Barcode Scanner Panel -->
+            <div class="tab-panel active" id="scanner-panel">
+                <div class="panel-header">
+                    <h2>Barcode Scanner</h2>
+                    <div class="status-light" id="scanner-status"></div>
+                </div>
+
+                <div class="input-group">
+                    <label for="barcode-format">Barcode Format:</label>
+                    <select id="barcode-format">
+                        <option value="upc-a">UPC-A</option>
+                        <option value="upc-e">UPC-E</option>
+                        <option value="code128">Code 128</option>
+                        <option value="code39">Code 39</option>
+                        <option value="qr">QR Code</option>
+                        <option value="datamatrix">Data Matrix</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="barcode-input">Barcode Value:</label>
+                    <input type="text" id="barcode-input" placeholder="Enter barcode value">
+                </div>
+
+                <div class="button-group">
+                    <button id="scan-btn" class="primary-btn">🔍 Scan Barcode</button>
+                    <button id="generate-barcode-btn" class="secondary-btn">🎲 Generate Test</button>
+                </div>
+
+                <div class="settings-group">
+                    <label>
+                        <input type="checkbox" id="simulate-enter" checked>
+                        Simulate Enter Key
+                    </label>
+                    <label>
+                        <input type="checkbox" id="simulate-typing">
+                        Simulate Typing
+                    </label>
+                </div>
+
+                <div class="activity-log" id="scanner-log">
+                    <h3>Recent Scans</h3>
+                    <div class="log-content"></div>
+                </div>
+            </div>
+
+            <!-- Magnetic Stripe Reader Panel -->
+            <div class="tab-panel" id="msr-panel">
+                <div class="panel-header">
+                    <h2>Magnetic Stripe Reader</h2>
+                    <div class="status-light" id="msr-status"></div>
+                </div>
+
+                <div class="input-group">
+                    <label for="card-type">Card Type:</label>
+                    <select id="card-type">
+                        <option value="credit">Credit Card</option>
+                        <option value="debit">Debit Card</option>
+                        <option value="gift">Gift Card</option>
+                        <option value="loyalty">Loyalty Card</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="track1-input">Track 1 Data:</label>
+                    <input type="text" id="track1-input" placeholder="%B4111111111111111^DOE/JOHN^2512101?">
+                </div>
+
+                <div class="input-group">
+                    <label for="track2-input">Track 2 Data:</label>
+                    <input type="text" id="track2-input" placeholder=";4111111111111111=25121010000100000?">
+                </div>
+
+                <div class="button-group">
+                    <button id="swipe-btn" class="primary-btn">💳 Swipe Card</button>
+                    <button id="generate-card-btn" class="secondary-btn">🎲 Generate Test Card</button>
+                </div>
+
+                <div class="activity-log" id="msr-log">
+                    <h3>Recent Swipes</h3>
+                    <div class="log-content"></div>
+                </div>
+            </div>
+
+            <!-- Receipt Printer Panel -->
+            <div class="tab-panel" id="printer-panel">
+                <div class="panel-header">
+                    <h2>Receipt Printer</h2>
+                    <div class="status-light" id="printer-status"></div>
+                </div>
+
+                <div class="input-group">
+                    <label for="printer-model">Printer Model:</label>
+                    <select id="printer-model">
+                        <option value="epson">Epson ESC/POS</option>
+                        <option value="star">Star Micronics</option>
+                        <option value="citizen">Citizen</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button id="test-print-btn" class="primary-btn">🖨️ Test Print</button>
+                    <button id="clear-receipt-btn" class="secondary-btn">🗑️ Clear</button>
+                </div>
+
+                <div class="receipt-display" id="receipt-display">
+                    <div class="receipt-paper">
+                        <div class="receipt-content">
+                            <div class="receipt-line">VIRTUAL RECEIPT PRINTER</div>
+                            <div class="receipt-line">Ready for print jobs...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="printer-controls">
+                    <label>
+                        <input type="checkbox" id="auto-cut" checked>
+                        Auto Cut Paper
+                    </label>
+                    <label>
+                        <input type="checkbox" id="drawer-kick">
+                        Trigger Drawer Kick
+                    </label>
+                </div>
+            </div>
+
+            <!-- Cash Drawer Panel -->
+            <div class="tab-panel" id="drawer-panel">
+                <div class="panel-header">
+                    <h2>Cash Drawer</h2>
+                    <div class="status-light" id="drawer-status"></div>
+                </div>
+
+                <div class="drawer-visual">
+                    <div class="drawer-container">
+                        <div class="drawer" id="drawer-visual">
+                            <div class="drawer-front">Cash Drawer</div>
+                            <div class="drawer-status-text" id="drawer-status-text">Closed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="open-drawer-btn" class="primary-btn">🔓 Open Drawer</button>
+                    <button id="close-drawer-btn" class="secondary-btn">🔒 Close Drawer</button>
+                </div>
+
+                <div class="settings-group">
+                    <div class="input-group">
+                        <label for="drawer-interface">Interface:</label>
+                        <select id="drawer-interface">
+                            <option value="printer">Printer Port (RJ11)</option>
+                            <option value="serial">Serial/USB</option>
+                            <option value="network">Network</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="activity-log" id="drawer-log">
+                    <h3>Drawer Activity</h3>
+                    <div class="log-content"></div>
+                </div>
+            </div>
+
+            <!-- Weight Scale Panel -->
+            <div class="tab-panel" id="scale-panel">
+                <div class="panel-header">
+                    <h2>Weight Scale</h2>
+                    <div class="status-light" id="scale-status"></div>
+                </div>
+
+                <div class="scale-display">
+                    <div class="weight-readout">
+                        <span class="weight-value" id="weight-value">0.00</span>
+                        <span class="weight-unit" id="weight-unit">lbs</span>
+                    </div>
+                    <div class="scale-indicators">
+                        <span class="indicator" id="stable-indicator">STABLE</span>
+                        <span class="indicator" id="zero-indicator">ZERO</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="weight-input">Weight:</label>
+                    <input type="number" id="weight-input" min="0" max="999.99" step="0.01" value="0.00">
+                </div>
+
+                <div class="input-group">
+                    <label for="weight-unit-select">Unit:</label>
+                    <select id="weight-unit-select">
+                        <option value="lbs">Pounds (lbs)</option>
+                        <option value="kg">Kilograms (kg)</option>
+                        <option value="g">Grams (g)</option>
+                        <option value="oz">Ounces (oz)</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button id="tare-btn" class="secondary-btn">⚖️ Tare</button>
+                    <button id="zero-btn" class="secondary-btn">0️⃣ Zero</button>
+                    <button id="calibrate-btn" class="secondary-btn">🔧 Calibrate</button>
+                </div>
+
+                <div class="weight-slider">
+                    <label for="weight-slider-input">Quick Weight:</label>
+                    <input type="range" id="weight-slider-input" min="0" max="50" step="0.1" value="0">
+                </div>
+            </div>
+
+            <!-- Line Display Panel -->
+            <div class="tab-panel" id="display-panel">
+                <div class="panel-header">
+                    <h2>Customer Line Display</h2>
+                    <div class="status-light" id="display-status"></div>
+                </div>
+
+                <div class="line-display-visual">
+                    <div class="display-screen">
+                        <div class="display-line" id="display-line1">WELCOME TO OUR STORE</div>
+                        <div class="display-line" id="display-line2">THANK YOU FOR SHOPPING!</div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="line1-input">Line 1:</label>
+                    <input type="text" id="line1-input" maxlength="20" placeholder="Max 20 characters">
+                </div>
+
+                <div class="input-group">
+                    <label for="line2-input">Line 2:</label>
+                    <input type="text" id="line2-input" maxlength="20" placeholder="Max 20 characters">
+                </div>
+
+                <div class="button-group">
+                    <button id="update-display-btn" class="primary-btn">📝 Update Display</button>
+                    <button id="clear-display-btn" class="secondary-btn">🗑️ Clear Display</button>
+                </div>
+
+                <div class="settings-group">
+                    <div class="input-group">
+                        <label for="display-brightness">Brightness:</label>
+                        <input type="range" id="display-brightness" min="1" max="4" value="3">
+                    </div>
+                    <label>
+                        <input type="checkbox" id="display-blink">
+                        Blinking Text
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Controls -->
+        <footer class="footer">
+            <div class="connection-status">
+                <span id="connection-status">🔗 Connected to POS Application</span>
+            </div>
+            <div class="global-controls">
+                <button id="reset-all-btn" class="danger-btn">🔄 Reset All</button>
+                <button id="settings-btn" class="secondary-btn">⚙️ Settings</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Settings Modal (hidden by default) -->
+    <div class="modal" id="settings-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Extension Settings</h2>
+                <button class="close-btn" id="close-settings-btn">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="target-url">Target POS URL Pattern:</label>
+                    <input type="text" id="target-url" placeholder="https://yourpos.com/*">
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="debug-mode">
+                        Enable Debug Mode
+                    </label>
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="auto-detect-inputs">
+                        Auto-detect Input Fields
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-settings-btn" class="primary-btn">Save Settings</button>
+                <button id="cancel-settings-btn" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="panel.js"></script>
+</body>
+</html>
