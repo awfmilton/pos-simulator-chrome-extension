@@ -1,3 +1,203 @@
+// --- WebUSB Interception Logic ---
+(function() {
+    console.log('[CS] Attempting to intercept WebUSB API...');
+
+    if (!navigator.usb) {
+        console.warn('[CS] WebUSB API not found on navigator. Cannot intercept.');
+        return;
+    }
+
+    const fakeDevice = {
+        vendorId: 0x04b8, // Epson
+        productId: 0x0202, // TM-T20II
+        productName: 'Virtual ESC/POS Printer',
+        manufacturerName: 'POS Simulator',
+        serialNumber: '1234567890',
+        opened: false,
+
+        open: async function() {
+            console.log('[CS-USB] FAKE.open() called');
+            this.opened = true;
+            return Promise.resolve();
+        },
+
+        close: async function() {
+            console.log('[CS-USB] FAKE.close() called');
+            this.opened = false;
+            return Promise.resolve();
+        },
+
+        selectConfiguration: async function(configValue) {
+            console.log(`[CS-USB] FAKE.selectConfiguration(${configValue}) called`);
+            return Promise.resolve();
+        },
+
+        claimInterface: async function(interfaceNumber) {
+            console.log(`[CS-USB] FAKE.claimInterface(${interfaceNumber}) called`);
+            return Promise.resolve();
+        },
+
+        transferOut: async function(endpointNumber, data) {
+            console.log(`[CS-USB] FAKE.transferOut to endpoint ${endpointNumber} with ${data.byteLength} bytes.`);
+            // The data is an ArrayBuffer. We need to convert it to a serializable format.
+            const payloadArray = Array.from(new Uint8Array(data));
+
+            chrome.runtime.sendMessage({
+                type: 'RAW_ESCPOS_DATA',
+                payload: payloadArray
+            }).catch(error => console.error('[CS-USB] Error sending print data to service worker:', error));
+
+            return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
+        },
+
+        // Add other required methods to avoid errors
+        releaseInterface: async function(interfaceNumber) {
+            console.log(`[CS-USB] FAKE.releaseInterface(${interfaceNumber}) called`);
+            return Promise.resolve();
+        },
+
+        reset: async function() {
+            console.log(`[CS-USB] FAKE.reset() called`);
+            return Promise.resolve();
+        }
+    };
+
+    // Store original function
+    const originalRequestDevice = navigator.usb.requestDevice.bind(navigator.usb);
+
+    // Override requestDevice
+    navigator.usb.requestDevice = function(options) {
+        console.log('[CS] Intercepted navigator.usb.requestDevice call with options:', options);
+        // Immediately resolve with the fake device, bypassing the dialog
+        return Promise.resolve(fakeDevice);
+    };
+
+    console.log('[CS] WebUSB API (requestDevice) has been intercepted.');
+
+
+    // --- WebSerial Interception ---
+    if (navigator.serial) {
+        console.log('[CS] Attempting to intercept WebSerial API...');
+
+        const fakeSerialPort = {
+            getInfo: () => ({ usbVendorId: 0x1234, usbProductId: 0x5678 }),
+            opened: false,
+            writable: null,
+            readable: null,
+
+            open: async function(options) {
+                console.log('[CS-Serial] FAKE.open() called with options:', options);
+                this.opened = true;
+
+                this.writable = new WritableStream({
+                    write(chunk) {
+                        console.log(`[CS-Serial] FAKE WritableStream received ${chunk.byteLength} bytes.`);
+                        const payloadArray = Array.from(new Uint8Array(chunk));
+                        chrome.runtime.sendMessage({
+                            type: 'RAW_SERIAL_DATA',
+                            payload: payloadArray
+                        }).catch(error => console.error('[CS-Serial] Error sending serial data:', error));
+                    },
+                    close() {
+                        console.log('[CS-Serial] FAKE WritableStream closed.');
+                    },
+                    abort(err) {
+                        console.error('[CS-Serial] FAKE WritableStream aborted:', err);
+                    }
+                });
+
+                this.readable = new ReadableStream({
+                    start(controller) {
+                        console.log('[CS-Serial] FAKE ReadableStream started.');
+                    }
+                });
+
+                return Promise.resolve();
+            },
+
+            close: async function() {
+                console.log('[CS-Serial] FAKE.close() called');
+                this.opened = false;
+                if (this.writable) this.writable.close().catch(()=>{});
+                if (this.readable) this.readable.cancel().catch(()=>{});
+                this.writable = null;
+                this.readable = null;
+                return Promise.resolve();
+            }
+        };
+
+        navigator.serial.requestPort = async (options) => {
+            console.log('[CS] Intercepted navigator.serial.requestPort call with options:', options);
+            return Promise.resolve(fakeSerialPort);
+        };
+
+        console.log('[CS] WebSerial API (requestPort) has been intercepted.');
+    } else {
+        console.warn('[CS] WebSerial API not found. Cannot intercept.');
+    }
+    // --- End of WebSerial Interception ---
+
+    // --- Web Bluetooth Interception ---
+    if (navigator.bluetooth) {
+        console.log('[CS] Attempting to intercept Web Bluetooth API...');
+
+        const fakeCharacteristic = {
+            writeValue: async function(value) {
+                console.log(`[CS-BT] FAKE Characteristic.writeValue received ${value.byteLength} bytes.`);
+                const payloadArray = Array.from(new Uint8Array(value));
+                chrome.runtime.sendMessage({
+                    type: 'RAW_BLUETOOTH_DATA',
+                    payload: payloadArray
+                }).catch(error => console.error('[CS-BT] Error sending bluetooth data:', error));
+                return Promise.resolve();
+            }
+        };
+
+        const fakeService = {
+            getCharacteristic: async function(characteristic) {
+                console.log('[CS-BT] FAKE Service.getCharacteristic called with:', characteristic);
+                return Promise.resolve(fakeCharacteristic);
+            }
+        };
+
+        const fakeServer = {
+            connected: false,
+            connect: async function() {
+                console.log('[CS-BT] FAKE Server.connect called');
+                this.connected = true;
+                return Promise.resolve(this);
+            },
+            getPrimaryService: async function(service) {
+                console.log('[CS-BT] FAKE Server.getPrimaryService called with:', service);
+                return Promise.resolve(fakeService);
+            },
+            disconnect: function() {
+                console.log('[CS-BT] FAKE Server.disconnect called');
+                this.connected = false;
+            }
+        };
+
+        const fakeBluetoothDevice = {
+            id: 'FAKE_BT_DEVICE_ID',
+            name: 'Virtual Bluetooth Printer',
+            gatt: fakeServer,
+        };
+
+        navigator.bluetooth.requestDevice = async (options) => {
+            console.log('[CS] Intercepted navigator.bluetooth.requestDevice call with options:', options);
+            return Promise.resolve(fakeBluetoothDevice);
+        };
+
+        console.log('[CS] Web Bluetooth API (requestDevice) has been intercepted.');
+    } else {
+        console.warn('[CS] Web Bluetooth API not found. Cannot intercept.');
+    }
+    // --- End of Web Bluetooth Interception ---
+
+})();
+// --- End of WebUSB Interception ---
+
+
 // POS Peripheral Simulator - Content Script
 // Handles DOM interaction with the target POS application
 
@@ -11,18 +211,26 @@ class POSContentScript {
     }
 
     init() {
-        console.log('POS Peripheral Simulator Content Script loaded');
+        console.log('[CS] POS Peripheral Simulator Content Script loaded on', window.location.href);
 
         this.setupMessageListener();
         this.setupDOMObserver();
         this.trackFocusedElements();
 
         // Notify service worker that content script is ready
-        chrome.runtime.sendMessage({
-            action: 'CONTENT_SCRIPT_READY',
-            url: window.location.href
-        }).catch(() => {
-            // Service worker might not be ready yet
+        chrome.storage.local.get('posSimulatorSettings', (result) => {
+            const settings = result.posSimulatorSettings || {};
+            if (!settings.targetUrl || window.location.href.startsWith(settings.targetUrl)) {
+                console.log('[CS] Page matches target URL, notifying service worker.');
+                chrome.runtime.sendMessage({
+                    action: 'CONTENT_SCRIPT_READY',
+                    url: window.location.href
+                }).catch((error) => {
+                    console.warn('[CS] Could not notify service worker, it might not be ready yet.', error);
+                });
+            } else {
+                console.log('[CS] Page does not match target URL, running in idle mode.');
+            }
         });
     }
 
@@ -61,13 +269,13 @@ class POSContentScript {
         document.addEventListener('focusin', (event) => {
             if (this.isInputElement(event.target)) {
                 this.lastFocusedElement = event.target;
-                console.log('Focused element updated:', event.target);
+                console.log('[CS] Focused element updated:', event.target);
             }
         }, true);
     }
 
     scanForInputElements(container) {
-        // Look for common POS input elements
+        // console.log('[CS] Scanning for input elements in:', container);
         const inputSelectors = [
             'input[type="text"]',
             'input[type="number"]',
@@ -89,7 +297,7 @@ class POSContentScript {
             elements.forEach(element => {
                 if (!element.dataset.posSimulatorRegistered) {
                     element.dataset.posSimulatorRegistered = 'true';
-                    console.log('Registered input element:', element);
+                    console.log('[CS] Registered input element:', element);
                 }
             });
         });
@@ -97,7 +305,7 @@ class POSContentScript {
 
     handleMessage(request, sender, sendResponse) {
         try {
-            console.log('Content script received message:', request);
+            console.log('[CS] Received message:', request);
 
             switch (request.action) {
                 case 'INJECT_INPUT':
@@ -119,25 +327,26 @@ class POSContentScript {
                     return;
 
                 default:
-                    console.warn('Unknown content script action:', request.action);
+                    console.warn('[CS] Unknown content script action:', request.action);
             }
 
             sendResponse({ success: true });
         } catch (error) {
-            console.error('Error in content script:', error);
+            console.error('[CS] Error in content script:', error);
             sendResponse({ success: false, error: error.message });
         }
     }
 
     injectInput(data) {
+        console.log('[CS] Attempting to inject input:', data);
         const targetElement = this.findTargetElement(data.type);
 
         if (!targetElement) {
-            console.warn('No suitable target element found for input injection');
+            console.warn('[CS] No suitable target element found for input injection.');
             return false;
         }
 
-        console.log('Injecting input into:', targetElement);
+        console.log('[CS] Injecting input into:', targetElement);
 
         // Method 1: Direct value injection (most reliable for modern frameworks)
         this.setElementValue(targetElement, data.value);
@@ -281,7 +490,7 @@ class POSContentScript {
             try {
                 element.dispatchEvent(event);
             } catch (error) {
-                console.warn('Error dispatching event:', error);
+                console.warn('[CS] Error dispatching event:', error);
             }
         });
 
@@ -289,10 +498,10 @@ class POSContentScript {
         try {
             element.focus();
         } catch (error) {
-            console.warn('Error focusing element:', error);
+            console.warn('[CS] Error focusing element:', error);
         }
 
-        console.log(`Value injected: "${originalValue}" -> "${value}"`);
+        console.log(`[CS] Value injected: "${originalValue}" -> "${value}"`);
     }
 
     simulateTyping(element, text) {

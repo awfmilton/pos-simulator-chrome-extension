@@ -14,14 +14,31 @@ class PeripheralSimulatorService {
 
         this.serialPorts = new Map();
         this.usbDevices = new Map();
+        this.posUrl = null;
+        this.sidePanelPort = null;
 
         this.init();
     }
 
     init() {
-        console.log('POS Peripheral Simulator Service Worker initialized');
+        console.log('[SW] Initializing Service Worker...');
         this.setupMessageHandlers();
         this.setupSidePanel();
+        this.setupSidePanelConnection();
+        console.log('[SW] Service Worker initialized.');
+    }
+
+    setupSidePanelConnection() {
+        chrome.runtime.onConnect.addListener(port => {
+            if (port.name === 'sidepanel') {
+                this.sidePanelPort = port;
+                console.log('[SW] Side panel connected.');
+                port.onDisconnect.addListener(() => {
+                    this.sidePanelPort = null;
+                    console.log('[SW] Side panel disconnected.');
+                });
+            }
+        });
     }
 
     setupMessageHandlers() {
@@ -39,9 +56,57 @@ class PeripheralSimulatorService {
 
     async handleMessage(request, sender, sendResponse) {
         try {
-            console.log('Service Worker received message:', request);
+            console.log(`[SW] Received message:`, request, `from sender:`, sender);
 
-            switch (request.action) {
+            // The user's provided code uses `type` instead of `action`.
+            // I'll handle both for now to be safe.
+            const action = request.action || request.type;
+
+            switch (action) {
+                case 'RAW_ESCPOS_DATA':
+                case 'RAW_SERIAL_DATA':
+                case 'RAW_BLUETOOTH_DATA':
+                    if (this.sidePanelPort) {
+                        console.log(`[SW] Forwarding ${action} to side panel.`);
+                        this.sidePanelPort.postMessage({ type: 'PRINT_DATA_RECEIVED', payload: request.payload });
+                    } else {
+                        console.error(`[SW] Side panel is not open. Cannot display print data for ${action}.`);
+                    }
+                    break;
+
+                case 'SIMULATE_BARCODE_SCAN':
+                    console.log('[SW] Simulating barcode scan:', request.barcode);
+                    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                        if (tabs[0]) {
+                            for (const char of request.barcode) {
+                                chrome.scripting.executeScript({
+                                    target: { tabId: tabs[0].id },
+                                    func: (key) => {
+                                        window.dispatchEvent(new KeyboardEvent('keydown', { 'key': key }));
+                                    },
+                                    args: [char]
+                                });
+                            }
+                            chrome.scripting.executeScript({
+                                target: { tabId: tabs[0].id },
+                                func: () => {
+                                    window.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Enter' }));
+                                }
+                            });
+                        }
+                    });
+                    break;
+
+                case 'CONTENT_SCRIPT_READY':
+                    this.posUrl = sender.tab ? sender.tab.url : null;
+                    console.log(`[SW] Content script ready on: ${this.posUrl}`);
+                    this.notifyUIPanel('CONNECTION_STATUS', { connected: true, url: this.posUrl });
+                    break;
+
+                case 'GET_CONNECTION_STATUS':
+                    sendResponse({ success: true, connected: !!this.posUrl, url: this.posUrl });
+                    return;
+
                 case 'SCAN_BARCODE':
                     await this.handleBarcodeScans(request.data);
                     break;
@@ -75,17 +140,18 @@ class PeripheralSimulatorService {
                     break;
 
                 default:
-                    console.warn('Unknown action:', request.action);
+                    console.warn('[SW] Unknown action:', request.action);
             }
 
             sendResponse({ success: true });
         } catch (error) {
-            console.error('Error handling message:', error);
+            console.error('[SW] Error handling message:', error);
             sendResponse({ success: false, error: error.message });
         }
     }
 
     async handleBarcodeScans(data) {
+        console.log('[SW] Handling barcode scan:', data);
         this.peripheralStates.scanner.lastScan = {
             value: data.barcode,
             format: data.format,
@@ -104,6 +170,7 @@ class PeripheralSimulatorService {
     }
 
     async handleMSRSwipe(data) {
+        console.log('[SW] Handling MSR swipe:', data);
         this.peripheralStates.msr.lastSwipe = {
             track1: data.track1,
             track2: data.track2,
@@ -123,6 +190,7 @@ class PeripheralSimulatorService {
     }
 
     async handlePrintJob(data) {
+        console.log('[SW] Handling print job:', data);
         const job = {
             id: Date.now(),
             data: data.escposData || data.rawData,
@@ -141,6 +209,7 @@ class PeripheralSimulatorService {
     }
 
     async handleDrawerOpen() {
+        console.log('[SW] Handling drawer open.');
         this.peripheralStates.drawer.open = true;
         this.notifyUIPanel('DRAWER_OPENED', { timestamp: Date.now() });
 
@@ -152,16 +221,19 @@ class PeripheralSimulatorService {
     }
 
     async handleScaleUpdate(data) {
+        console.log('[SW] Handling scale update:', data);
         this.peripheralStates.scale = { ...this.peripheralStates.scale, ...data };
         this.notifyUIPanel('SCALE_UPDATED', this.peripheralStates.scale);
     }
 
     async handleDisplayUpdate(data) {
+        console.log('[SW] Handling display update:', data);
         this.peripheralStates.display = { ...this.peripheralStates.display, ...data };
         this.notifyUIPanel('DISPLAY_UPDATED', this.peripheralStates.display);
     }
 
     async injectInputToActivePage(data) {
+        console.log('[SW] Injecting input to active page:', data);
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (tab) {
@@ -171,11 +243,12 @@ class PeripheralSimulatorService {
                 });
             }
         } catch (error) {
-            console.error('Error injecting input to active page:', error);
+            console.error('[SW] Error injecting input to active page:', error);
         }
     }
 
     notifyUIPanel(event, data) {
+        console.log(`[SW] Notifying UI panel of event: ${event}`, data);
         // Send message to UI panel
         chrome.runtime.sendMessage({
             action: 'PERIPHERAL_EVENT',
@@ -183,11 +256,12 @@ class PeripheralSimulatorService {
             data: data
         }).catch(error => {
             // UI panel might not be open, ignore error
-            console.log('UI panel not available:', error.message);
+            console.log('[SW] UI panel not available:', error.message);
         });
     }
 
     parseESCPOSCommands(data) {
+        console.log('[SW] Parsing ESC/POS commands from data:', data);
         // Basic ESC/POS command parser
         if (typeof data === 'string') {
             return this.parseTextCommands(data);
