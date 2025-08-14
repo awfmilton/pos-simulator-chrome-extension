@@ -5,6 +5,7 @@ class POSSimulatorPanel {
     constructor() {
         this.currentTab = 'scanner';
         this.peripheralStates = {};
+        this.escposParser = new EscPosParser();
         this.testData = {
             barcodes: {
                 'upc-a': '012345678905',
