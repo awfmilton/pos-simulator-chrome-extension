@@ -138,7 +138,6 @@
         };
 
         console.log('[CS] WebSerial API (requestPort) has been intercepted.');
-    }
     // --- End of WebSerial Interception ---
 
     // --- Polyfill and Intercept Web Bluetooth ---
@@ -198,7 +197,6 @@
         };
 
         console.log('[CS] Web Bluetooth API (requestDevice) has been intercepted.');
-    }
     // --- End of Web Bluetooth Interception ---
 
 })();
