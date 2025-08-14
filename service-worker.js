@@ -66,11 +66,12 @@ class PeripheralSimulatorService {
                 case 'RAW_ESCPOS_DATA':
                 case 'RAW_SERIAL_DATA':
                 case 'RAW_BLUETOOTH_DATA':
+                    console.log(`[SW-LOG] Step 5: Received ${action} from content script.`);
                     if (this.sidePanelPort) {
-                        console.log(`[SW] Forwarding ${action} to side panel.`);
+                        console.log('[SW-LOG] Step 6: Side panel port is connected. Forwarding data.');
                         this.sidePanelPort.postMessage({ type: 'PRINT_DATA_RECEIVED', payload: request.payload });
                     } else {
-                        console.error(`[SW] Side panel is not open. Cannot display print data for ${action}.`);
+                        console.error(`[SW-LOG] Step 6 FAILED: Side panel port is not connected. Cannot forward ${action}.`);
                     }
                     break;
 

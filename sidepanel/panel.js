@@ -452,11 +452,17 @@ class POSSimulatorPanel {
         console.log(`[PANEL] Handling peripheral event: ${event}`, data);
         switch (event) {
             case 'PRINT_DATA_RECEIVED':
-                console.log('[PANEL] Received print data:', data);
-                // Data is an array of char codes, decode it
-                const decodedString = new TextDecoder().decode(new Uint8Array(data.payload));
-                this.displayReceipt(decodedString);
-                this.logActivity('printer', `Received ${data.payload.length} bytes of print data.`);
+                console.log('[PANEL-LOG] Step 7: Received PRINT_DATA_RECEIVED event.');
+                try {
+                    const decodedString = new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(data.payload));
+                    console.log(`[PANEL-LOG] Step 8: Decoded data (${data.payload.length} bytes) to string:`, decodedString);
+                    this.displayReceipt(decodedString);
+                    console.log('[PANEL-LOG] Step 9: Called displayReceipt with decoded string.');
+                    this.logActivity('printer', `Rendered ${data.payload.length} bytes of print data.`);
+                } catch (e) {
+                    console.error('[PANEL-LOG] Step 8 FAILED: Could not decode print data.', e);
+                    this.showError('Failed to decode print data.');
+                }
                 break;
             case 'CONNECTION_STATUS':
                 this.updateConnectionStatus(data.connected, data.url);

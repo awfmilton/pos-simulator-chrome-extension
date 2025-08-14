@@ -38,14 +38,14 @@
         },
 
         transferOut: async function(endpointNumber, data) {
-            console.log(`[CS-USB] FAKE.transferOut to endpoint ${endpointNumber} with ${data.byteLength} bytes.`);
-            // The data is an ArrayBuffer. We need to convert it to a serializable format.
+            console.log(`[CS-USB-LOG] Step 3: transferOut called with ${data.byteLength} bytes.`);
             const payloadArray = Array.from(new Uint8Array(data));
 
+            console.log('[CS-USB-LOG] Step 4: Sending RAW_ESCPOS_DATA to service worker.');
             chrome.runtime.sendMessage({
                 type: 'RAW_ESCPOS_DATA',
                 payload: payloadArray
-            }).catch(error => console.error('[CS-USB] Error sending print data to service worker:', error));
+            }).catch(error => console.error('[CS-USB-LOG] Error sending print data to service worker:', error));
 
             return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
         },
@@ -67,7 +67,8 @@
 
     // Override requestDevice
     navigator.usb.requestDevice = function(options) {
-        console.log('[CS] Intercepted navigator.usb.requestDevice call with options:', options);
+        console.log('[CS-USB-LOG] Step 1: Intercepted navigator.usb.requestDevice call.');
+        console.log('[CS-USB-LOG] Step 2: Returning fake USB device.');
         // Immediately resolve with the fake device, bypassing the dialog
         return Promise.resolve(fakeDevice);
     };
@@ -91,12 +92,14 @@
 
                 this.writable = new WritableStream({
                     write(chunk) {
-                        console.log(`[CS-Serial] FAKE WritableStream received ${chunk.byteLength} bytes.`);
+                        console.log(`[CS-Serial-LOG] Step 3: WritableStream.write called with ${chunk.byteLength} bytes.`);
                         const payloadArray = Array.from(new Uint8Array(chunk));
+
+                        console.log('[CS-Serial-LOG] Step 4: Sending RAW_SERIAL_DATA to service worker.');
                         chrome.runtime.sendMessage({
                             type: 'RAW_SERIAL_DATA',
                             payload: payloadArray
-                        }).catch(error => console.error('[CS-Serial] Error sending serial data:', error));
+                        }).catch(error => console.error('[CS-Serial-LOG] Error sending serial data:', error));
                     },
                     close() {
                         console.log('[CS-Serial] FAKE WritableStream closed.');
@@ -127,7 +130,8 @@
         };
 
         navigator.serial.requestPort = async (options) => {
-            console.log('[CS] Intercepted navigator.serial.requestPort call with options:', options);
+            console.log('[CS-Serial-LOG] Step 1: Intercepted navigator.serial.requestPort call.');
+            console.log('[CS-Serial-LOG] Step 2: Returning fake SerialPort.');
             return Promise.resolve(fakeSerialPort);
         };
 
@@ -143,12 +147,14 @@
 
         const fakeCharacteristic = {
             writeValue: async function(value) {
-                console.log(`[CS-BT] FAKE Characteristic.writeValue received ${value.byteLength} bytes.`);
+                console.log(`[CS-BT-LOG] Step 3: Characteristic.writeValue called with ${value.byteLength} bytes.`);
                 const payloadArray = Array.from(new Uint8Array(value));
+
+                console.log('[CS-BT-LOG] Step 4: Sending RAW_BLUETOOTH_DATA to service worker.');
                 chrome.runtime.sendMessage({
                     type: 'RAW_BLUETOOTH_DATA',
                     payload: payloadArray
-                }).catch(error => console.error('[CS-BT] Error sending bluetooth data:', error));
+                }).catch(error => console.error('[CS-BT-LOG] Error sending bluetooth data:', error));
                 return Promise.resolve();
             }
         };
@@ -184,7 +190,8 @@
         };
 
         navigator.bluetooth.requestDevice = async (options) => {
-            console.log('[CS] Intercepted navigator.bluetooth.requestDevice call with options:', options);
+            console.log('[CS-BT-LOG] Step 1: Intercepted navigator.bluetooth.requestDevice call.');
+            console.log('[CS-BT-LOG] Step 2: Returning fake BluetoothDevice.');
             return Promise.resolve(fakeBluetoothDevice);
         };
 
