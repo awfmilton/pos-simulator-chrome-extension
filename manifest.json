@@ -41,5 +41,11 @@
   "host_permissions": [
     "http://*/*",
     "https://*/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "port-simulator.js" ],
+      "matches": [ "<all_urls>" ]
+    }
   ]
 }
