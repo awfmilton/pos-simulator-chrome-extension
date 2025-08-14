@@ -1,10 +1,10 @@
 // --- WebUSB Interception Logic ---
 (function() {
-    console.log('[CS] Attempting to intercept WebUSB API...');
-
+    // --- Polyfill and Intercept WebUSB ---
+    console.log('[CS] Setting up WebUSB interception...');
     if (!navigator.usb) {
-        console.warn('[CS] WebUSB API not found on navigator. Cannot intercept.');
-        return;
+        console.log('[CS] Polyfilling navigator.usb');
+        navigator.usb = {};
     }
 
     const fakeDevice = {
@@ -76,11 +76,13 @@
     console.log('[CS] WebUSB API (requestDevice) has been intercepted.');
 
 
-    // --- WebSerial Interception ---
-    if (navigator.serial) {
-        console.log('[CS] Attempting to intercept WebSerial API...');
-
-        const fakeSerialPort = {
+    // --- Polyfill and Intercept WebSerial ---
+    console.log('[CS] Setting up WebSerial interception...');
+    if (!navigator.serial) {
+        console.log('[CS] Polyfilling navigator.serial');
+        navigator.serial = {};
+    }
+    const fakeSerialPort = {
             getInfo: () => ({ usbVendorId: 0x1234, usbProductId: 0x5678 }),
             opened: false,
             writable: null,
@@ -136,16 +138,16 @@
         };
 
         console.log('[CS] WebSerial API (requestPort) has been intercepted.');
-    } else {
-        console.warn('[CS] WebSerial API not found. Cannot intercept.');
     }
     // --- End of WebSerial Interception ---
 
-    // --- Web Bluetooth Interception ---
-    if (navigator.bluetooth) {
-        console.log('[CS] Attempting to intercept Web Bluetooth API...');
-
-        const fakeCharacteristic = {
+    // --- Polyfill and Intercept Web Bluetooth ---
+    console.log('[CS] Setting up Web Bluetooth interception...');
+    if (!navigator.bluetooth) {
+        console.log('[CS] Polyfilling navigator.bluetooth');
+        navigator.bluetooth = {};
+    }
+    const fakeCharacteristic = {
             writeValue: async function(value) {
                 console.log(`[CS-BT-LOG] Step 3: Characteristic.writeValue called with ${value.byteLength} bytes.`);
                 const payloadArray = Array.from(new Uint8Array(value));
@@ -196,8 +198,6 @@
         };
 
         console.log('[CS] Web Bluetooth API (requestDevice) has been intercepted.');
-    } else {
-        console.warn('[CS] Web Bluetooth API not found. Cannot intercept.');
     }
     // --- End of Web Bluetooth Interception ---
 
