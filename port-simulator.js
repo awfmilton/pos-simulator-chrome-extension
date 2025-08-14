@@ -384,7 +384,9 @@ class ESCPOSParser {
     }
 }
 
-// Export for use in other modules
+// Export for use in other modules or attach to window for browser environments
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ESCPOSParser;
+} else {
+    window.ESCPOSParser = ESCPOSParser;
 }
