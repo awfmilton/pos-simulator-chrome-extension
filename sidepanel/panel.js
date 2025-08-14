@@ -102,7 +102,7 @@ class POSSimulatorPanel {
 
         // Initialize status indicators
         this.updateStatusIndicators();
-        this.updateConnectionStatus('Connected');
+        this.updateConnectionStatus(false, null); // Set initial state to disconnected
 
         // Load saved settings
         this.loadSettings();
@@ -513,10 +513,17 @@ class POSSimulatorPanel {
 
     updateConnectionStatus(connected, url) {
         const statusEl = document.getElementById('connection-status');
-        if (connected) {
-            statusEl.textContent = `🔗 Connected to ${new URL(url).hostname}`;
-            statusEl.classList.add('connected');
-            statusEl.classList.remove('disconnected');
+        if (connected && url) {
+            try {
+                statusEl.textContent = `🔗 Connected to ${new URL(url).hostname}`;
+                statusEl.classList.add('connected');
+                statusEl.classList.remove('disconnected');
+            } catch (e) {
+                console.error(`[PANEL] Invalid URL provided to updateConnectionStatus: ${url}`, e);
+                statusEl.textContent = '⚠️ Invalid URL';
+                statusEl.classList.add('disconnected');
+                statusEl.classList.remove('connected');
+            }
         } else {
             statusEl.textContent = '🔌 Disconnected';
             statusEl.classList.add('disconnected');
