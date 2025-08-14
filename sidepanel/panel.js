@@ -34,7 +34,7 @@ class POSSimulatorPanel {
     }
 
     init() {
-        console.log('POS Simulator Panel initialized');
+        console.log('[PANEL] POS Simulator Panel initialized');
         this.setupEventListeners();
         this.initializeUI();
         this.connectToServiceWorker();
@@ -90,10 +90,6 @@ class POSSimulatorPanel {
         document.getElementById('save-settings-btn').addEventListener('click', () => this.saveSettings());
         document.getElementById('cancel-settings-btn').addEventListener('click', () => this.hideSettings());
 
-        // Listen for messages from service worker
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            this.handleMessage(request, sender, sendResponse);
-        });
     }
 
     initializeUI() {
@@ -113,13 +109,34 @@ class POSSimulatorPanel {
     }
 
     connectToServiceWorker() {
+        console.log('[PANEL] Connecting to service worker...');
+        const port = chrome.runtime.connect({ name: 'sidepanel' });
+
+        port.onMessage.addListener((message) => {
+            this.handleMessage(message);
+        });
+
+        port.onDisconnect.addListener(() => {
+            console.warn('[PANEL] Disconnected from service worker.');
+            this.updateConnectionStatus(false, null);
+        });
+
         // Get initial state from service worker
-        chrome.runtime.sendMessage({ action: 'GET_STATE' }, (response) => {
+        this.sendMessage('GET_STATE').then(response => {
             if (response && response.success) {
+                console.log('[PANEL] Initial state received:', response.data);
                 this.peripheralStates = response.data;
                 this.updateUIFromState();
             }
-        });
+        }).catch(error => console.error('[PANEL] Error getting initial state:', error));
+
+        // Get initial connection status
+        this.sendMessage('GET_CONNECTION_STATUS').then(response => {
+            if (response && response.success) {
+                console.log('[PANEL] Initial connection status:', response);
+                this.updateConnectionStatus(response.connected, response.url);
+            }
+        }).catch(error => console.error('[PANEL] Error getting connection status:', error));
     }
 
     switchTab(tabName) {
@@ -414,20 +431,36 @@ class POSSimulatorPanel {
         });
     }
 
-    handleMessage(request, sender, sendResponse) {
-        console.log('Panel received message:', request);
+    handleMessage(request) {
+        console.log('[PANEL] Received message:', request);
 
-        switch (request.action) {
+        // Messages from the port don't use request/response
+        const action = request.action || request.type;
+
+        switch (action) {
             case 'PERIPHERAL_EVENT':
                 this.handlePeripheralEvent(request.event, request.data);
                 break;
+            // The service worker now sends PRINT_DATA_RECEIVED directly to the port
+            case 'PRINT_DATA_RECEIVED':
+                this.handlePeripheralEvent('PRINT_DATA_RECEIVED', { payload: request.payload });
+                break;
         }
-
-        sendResponse({ success: true });
     }
 
     handlePeripheralEvent(event, data) {
+        console.log(`[PANEL] Handling peripheral event: ${event}`, data);
         switch (event) {
+            case 'PRINT_DATA_RECEIVED':
+                console.log('[PANEL] Received print data:', data);
+                // Data is an array of char codes, decode it
+                const decodedString = new TextDecoder().decode(new Uint8Array(data.payload));
+                this.displayReceipt(decodedString);
+                this.logActivity('printer', `Received ${data.payload.length} bytes of print data.`);
+                break;
+            case 'CONNECTION_STATUS':
+                this.updateConnectionStatus(data.connected, data.url);
+                break;
             case 'SCAN_COMPLETE':
                 // Handle scan completion
                 break;
@@ -472,13 +505,22 @@ class POSSimulatorPanel {
         }, 3000);
     }
 
-    updateConnectionStatus(status) {
-        document.getElementById('connection-status').textContent = `🔗 ${status}`;
+    updateConnectionStatus(connected, url) {
+        const statusEl = document.getElementById('connection-status');
+        if (connected) {
+            statusEl.textContent = `🔗 Connected to ${new URL(url).hostname}`;
+            statusEl.classList.add('connected');
+            statusEl.classList.remove('disconnected');
+        } else {
+            statusEl.textContent = '🔌 Disconnected';
+            statusEl.classList.add('disconnected');
+            statusEl.classList.remove('connected');
+        }
     }
 
     showError(message) {
         this.updateStatus(`❌ ${message}`);
-        console.error(message);
+        console.error('[PANEL] Error:', message);
     }
 
     updateStatusIndicators() {
@@ -570,7 +612,3 @@ document.addEventListener('DOMContentLoaded', () => {
     window.posSimulator = new POSSimulatorPanel();
 });
 
-// Handle service worker updates
-chrome.runtime.onConnect.addListener((port) => {
-    console.log('Connected to service worker');
-});
