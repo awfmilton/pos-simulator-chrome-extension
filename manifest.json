@@ -18,7 +18,6 @@
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": [
-      "port-simulator.js",
       "content-script.js"
     ],
     "run_at": "document_idle"
@@ -41,11 +40,5 @@
   "host_permissions": [
     "http://*/*",
     "https://*/*"
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [ "port-simulator.js" ],
-      "matches": [ "<all_urls>" ]
-    }
   ]
 }
