@@ -344,8 +344,9 @@ button {
 
 .receipt-line {
     margin-bottom: 4px;
-    white-space: pre;
-    word-wrap: break-word;
+    white-space: pre-wrap; /* Allows wrapping of long lines */
+    word-wrap: break-word;   /* Breaks long words that would overflow */
+    overflow-wrap: break-word; /* Standard property for word breaking */
 }
 
 .receipt-line.bold {

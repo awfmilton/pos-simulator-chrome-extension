@@ -615,6 +615,13 @@ class POSSimulatorPanel {
                             receiptText += textNodes[i].textContent;
                         }
 
+                        // As a quality-of-life improvement, replace "Invalid Date" with the current date.
+                        if (receiptText.includes('Date: Invalid Date')) {
+                            const now = new Date();
+                            const formattedDate = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+                            receiptText = receiptText.replace('Date: Invalid Date', `Date: ${formattedDate}`);
+                        }
+
                         this.displayReceipt(receiptText);
                         this.logActivity('printer', `Rendered XML receipt from network printer.`);
                     } catch (e) {
@@ -624,6 +631,10 @@ class POSSimulatorPanel {
 
                 } else { // Handle binary data from USB, Serial, Bluetooth
                     try {
+                        // For debugging, log the raw hex data to see what we're receiving
+                        const hexString = Array.from(new Uint8Array(data.payload)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                        console.log(`[PANEL-DEBUG] Received raw binary data (${data.payload.length} bytes): ${hexString}`);
+
                         // Ensure payload is a Uint8Array
                         const printData = new Uint8Array(data.payload);
 
