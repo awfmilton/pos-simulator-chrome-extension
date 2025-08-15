@@ -16,7 +16,6 @@
             </div>
         </header>
 
-        <!-- Tab Navigation -->
         <nav class="tab-nav">
             <button class="tab-btn active" data-tab="scanner">
                 📱 Scanner
@@ -38,9 +37,7 @@
             </button>
         </nav>
 
-        <!-- Tab Panels -->
         <div class="tab-panels">
-            <!-- Barcode Scanner Panel -->
             <div class="tab-panel active" id="scanner-panel">
                 <div class="panel-header">
                     <h2>Barcode Scanner</h2>
@@ -86,7 +83,6 @@
                 </div>
             </div>
 
-            <!-- Magnetic Stripe Reader Panel -->
             <div class="tab-panel" id="msr-panel">
                 <div class="panel-header">
                     <h2>Magnetic Stripe Reader</h2>
@@ -124,21 +120,46 @@
                 </div>
             </div>
 
-            <!-- Receipt Printer Panel -->
             <div class="tab-panel" id="printer-panel">
                 <div class="panel-header">
                     <h2>Receipt Printer</h2>
-                    <div class="status-light" id="printer-status"></div>
                 </div>
 
-                <div class="input-group">
-                    <label for="printer-model">Printer Model:</label>
-                    <select id="printer-model">
-                        <option value="epson">Epson ESC/POS</option>
-                        <option value="star">Star Micronics</option>
-                        <option value="citizen">Citizen</option>
-                    </select>
+                <div class="printer-connection-controls">
+                    <div class="printer-control-group">
+                        <label class="switch">
+                            <input type="checkbox" id="usb-printer-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="printer-label">USB Printer</span>
+                        <div class="status-light" id="usb-printer-status"></div>
+                    </div>
+                    <div class="printer-control-group">
+                        <label class="switch">
+                            <input type="checkbox" id="bluetooth-printer-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="printer-label">Bluetooth Printer</span>
+                        <div class="status-light" id="bluetooth-printer-status"></div>
+                    </div>
+                    <div class="printer-control-group">
+                        <label class="switch">
+                            <input type="checkbox" id="serial-printer-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="printer-label">Serial Printer</span>
+                        <div class="status-light" id="serial-printer-status"></div>
+                    </div>
+                     <div class="printer-control-group">
+                        <label class="switch">
+                            <input type="checkbox" id="network-printer-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="printer-label">Network Printer</span>
+                        <div class="status-light" id="network-printer-status"></div>
+                    </div>
                 </div>
+
 
                 <div class="button-group">
                     <button id="test-print-btn" class="primary-btn">🖨️ Test Print</button>
@@ -153,20 +174,8 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="printer-controls">
-                    <label>
-                        <input type="checkbox" id="auto-cut" checked>
-                        Auto Cut Paper
-                    </label>
-                    <label>
-                        <input type="checkbox" id="drawer-kick">
-                        Trigger Drawer Kick
-                    </label>
-                </div>
             </div>
 
-            <!-- Cash Drawer Panel -->
             <div class="tab-panel" id="drawer-panel">
                 <div class="panel-header">
                     <h2>Cash Drawer</h2>
@@ -204,7 +213,6 @@
                 </div>
             </div>
 
-            <!-- Weight Scale Panel -->
             <div class="tab-panel" id="scale-panel">
                 <div class="panel-header">
                     <h2>Weight Scale</h2>
@@ -249,7 +257,6 @@
                 </div>
             </div>
 
-            <!-- Line Display Panel -->
             <div class="tab-panel" id="display-panel">
                 <div class="panel-header">
                     <h2>Customer Line Display</h2>
@@ -291,10 +298,10 @@
             </div>
         </div>
 
-        <!-- Global Controls -->
         <footer class="footer">
             <div class="connection-status">
-                <span id="connection-status">🔗 Connected to POS Application</span>
+                <span id="connection-indicator" class="status-light disconnected"></span>
+                <span id="connection-status-text">Disconnected</span>
             </div>
             <div class="global-controls">
                 <button id="reset-all-btn" class="danger-btn">🔄 Reset All</button>
@@ -303,7 +310,6 @@
         </footer>
     </div>
 
-    <!-- Settings Modal (hidden by default) -->
     <div class="modal" id="settings-modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
