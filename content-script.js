@@ -27,7 +27,8 @@ window.addEventListener('message', (event) => {
         chrome.runtime.sendMessage({
             type: 'RAW_DATA_FROM_PAGE', // Use a new message type
             source: event.data.source,
-            payload: event.data.payload
+            payload: event.data.payload,
+            deviceType: event.data.deviceType // Pass this along
         }).catch(error => {
             console.error('[CS] Error sending message to service worker:', error);
         });

@@ -579,10 +579,10 @@ class POSSimulatorPanel {
                 this.handlePeripheralEvent(request.event, request.data);
                 break;
             case 'PRINT_DATA_RECEIVED':
-                this.handlePeripheralEvent('PRINT_DATA_RECEIVED', { payload: request.payload });
+                this.handlePeripheralEvent('PRINT_DATA_RECEIVED', request); // Pass the whole message
                 break;
             case 'LINE_DISPLAY_DATA_RECEIVED':
-                this.handlePeripheralEvent('LINE_DISPLAY_DATA_RECEIVED', { payload: request.payload });
+                this.handlePeripheralEvent('LINE_DISPLAY_DATA_RECEIVED', request); // Pass the whole message
                 break;
         }
     }
@@ -594,25 +594,57 @@ class POSSimulatorPanel {
                 this.updateLineDisplayFromData(data.payload);
                 break;
             case 'PRINT_DATA_RECEIVED':
-                console.log('[PANEL-LOG] Step 7: Received PRINT_DATA_RECEIVED event.');
-                try {
-                    // The payload is an array of numbers, convert it to a Uint8Array
-                    const printData = new Uint8Array(data.payload);
-                    const decodedString = new TextDecoder("utf-8", { fatal: true }).decode(printData);
+                console.log(`[PANEL-LOG] Step 7: Received PRINT_DATA_RECEIVED event for device type: ${data.deviceType}`);
 
-                    console.log(`[PANEL-LOG] Step 8: Decoded data (${printData.length} bytes) to string.`);
-                    this.displayReceipt(decodedString);
-                    this.logActivity('printer', `Rendered ${printData.length} bytes of text data.`);
+                // Handle XML data from network ePOS printers
+                if (data.deviceType === 'network-printer' && typeof data.payload === 'string') {
+                    try {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(data.payload, "text/xml");
 
-                } catch (e) {
-                    console.warn('[PANEL-LOG] Step 8 FAILED: Could not decode print data as UTF-8. Assuming binary ESC/POS data.', e.message);
-                    // If decoding fails, it's likely binary data. We can't render it as a simple string.
-                    // For now, let's just log it and show a message on the receipt.
-                    const hexString = data.payload.map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    this.clearReceipt();
-                    this.displayReceipt(`Received ${data.payload.length} bytes of binary ESC/POS data.\n\nData (hex):\n${hexString}`);
-                    this.logActivity('printer', `Received ${data.payload.length} bytes of binary data.`);
-                    this.showError('Binary print data received.');
+                        // Check for parser errors, which can happen with malformed XML
+                        const parserError = xmlDoc.querySelector('parsererror');
+                        if (parserError) {
+                            throw new Error(`XML Parsing Error: ${parserError.innerText}`);
+                        }
+
+                        const textNodes = xmlDoc.getElementsByTagName('text');
+                        let receiptText = '';
+                        for (let i = 0; i < textNodes.length; i++) {
+                            // Re-create the line breaks that were in the original XML text nodes
+                            receiptText += textNodes[i].textContent;
+                        }
+
+                        this.displayReceipt(receiptText);
+                        this.logActivity('printer', `Rendered XML receipt from network printer.`);
+                    } catch (e) {
+                        this.showError(`Failed to parse ePOS XML: ${e.message}`);
+                        this.displayReceipt(`--- ERROR ---\nFailed to parse XML receipt:\n${e.message}\n\n--- RAW DATA ---\n${data.payload}`);
+                    }
+
+                } else { // Handle binary data from USB, Serial, Bluetooth
+                    try {
+                        // Ensure payload is a Uint8Array
+                        const printData = new Uint8Array(data.payload);
+
+                        // Use the EscPosParser to get structured data
+                        const parsedData = this.escposParser.parse(printData);
+
+                        // Use the renderer from the parser to generate HTML
+                        const receiptHtml = this.escposParser.renderToHTML(parsedData);
+                        const receiptContent = document.querySelector('.receipt-content');
+                        receiptContent.innerHTML = receiptHtml;
+
+                        this.logActivity('printer', `Rendered ${printData.length} bytes of binary ESC/POS data.`);
+
+                    } catch (e) {
+                        console.warn('[PANEL-LOG] Step 8 FAILED: Could not process binary print data.', e.message);
+                        const hexString = Array.from(new Uint8Array(data.payload)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                        this.clearReceipt();
+                        this.displayReceipt(`Received ${data.payload.length} bytes of unhandled binary data.\n\nData (hex):\n${hexString}`);
+                        this.logActivity('printer', `Received ${data.payload.length} bytes of unhandled binary data.`);
+                        this.showError('Unhandled binary print data received.');
+                    }
                 }
                 break;
             case 'CONNECTION_STATUS':
