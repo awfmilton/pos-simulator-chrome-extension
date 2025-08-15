@@ -465,6 +465,84 @@ class POSSimulatorPanel {
         document.getElementById('display-line2').textContent = line2.padEnd(20).substring(0, 20);
     }
 
+    updateLineDisplayFromData(payload) {
+        // A simple parser for VFD/LCD line display commands.
+        // It handles clear screen, cursor positioning, and printable text.
+        const line1El = document.getElementById('display-line1');
+        const line2El = document.getElementById('display-line2');
+        let text1 = line1El.textContent.trimEnd();
+        let text2 = line2El.textContent.trimEnd();
+        let currentLine = 1;
+
+        // Common command constants
+        const CMD_CLEAR_SCREEN = 0x0C; // Form Feed
+        const CMD_HOME = 0x0B; // Vertical Tab (often homes cursor)
+        const CMD_NEW_LINE = 0x0A; // Line Feed
+        const CMD_CARRIAGE_RETURN = 0x0D; // Carriage Return
+
+        let i = 0;
+        while (i < payload.length) {
+            const byte = payload[i];
+
+            if (byte === CMD_CLEAR_SCREEN) {
+                text1 = '';
+                text2 = '';
+                currentLine = 1;
+                i++;
+                continue;
+            }
+
+            if (byte === CMD_HOME) {
+                currentLine = 1;
+                i++;
+                continue;
+            }
+
+            if (byte === CMD_CARRIAGE_RETURN) {
+                if (currentLine === 1) text1 = '';
+                else text2 = '';
+                i++;
+                continue;
+            }
+
+            if (byte === CMD_NEW_LINE) {
+                currentLine = 2;
+                i++;
+                continue;
+            }
+
+            // Basic ESC positioning (e.g., ESC c k for select line k)
+            // This is a guess, but covers some devices.
+            if (byte === 0x1B && payload[i+1] === 0x63 && payload[i+2]) {
+                const lineNumber = payload[i+2];
+                if (lineNumber === 1 || lineNumber === 49) { // '1'
+                    currentLine = 1;
+                } else if (lineNumber === 2 || lineNumber === 50) { // '2'
+                    currentLine = 2;
+                }
+                i += 3;
+                continue;
+            }
+
+            // Printable ASCII characters
+            if (byte >= 32 && byte <= 126) {
+                const char = String.fromCharCode(byte);
+                if (currentLine === 1) {
+                    text1 += char;
+                } else {
+                    text2 += char;
+                }
+            }
+            i++;
+        }
+
+        // Update the UI, ensuring it's exactly 20 characters
+        line1El.textContent = text1.padEnd(20).substring(0, 20);
+        line2El.textContent = text2.padEnd(20).substring(0, 20);
+
+        this.logActivity('display', `Rendered ${payload.length} bytes of data.`);
+    }
+
     clearLineDisplay() {
         document.getElementById('line1-input').value = '';
         document.getElementById('line2-input').value = '';
