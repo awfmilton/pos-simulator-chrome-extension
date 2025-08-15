@@ -78,11 +78,22 @@ class PeripheralSimulatorService {
                     // Determine the message type based on the device that sent the data
                     switch (request.deviceType) {
                         case 'line-display':
-                            message = { type: 'LINE_DISPLAY_DATA_RECEIVED', payload: request.payload };
+                            message = {
+                                type: 'LINE_DISPLAY_DATA_RECEIVED',
+                                payload: request.payload,
+                                deviceType: request.deviceType
+                            };
                             break;
                         case 'printer':
+                        case 'network-printer':
+                        case 'bluetooth-printer':
+                        case 'serial':
                         default: // Fallback for older versions or other devices
-                            message = { type: 'PRINT_DATA_RECEIVED', payload: request.payload };
+                            message = {
+                                type: 'PRINT_DATA_RECEIVED',
+                                payload: request.payload,
+                                deviceType: request.deviceType // Pass along the specific type
+                            };
                             break;
                     }
 
