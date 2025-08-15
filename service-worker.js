@@ -63,17 +63,21 @@ class PeripheralSimulatorService {
             const action = request.action || request.type;
 
             switch (action) {
-                case 'RAW_ESCPOS_DATA':
-                case 'RAW_SERIAL_DATA':
-                case 'RAW_BLUETOOTH_DATA':
-                    console.log(`[SW-LOG] Step 5: Received ${action} from content script.`);
+                // ADD THIS NEW CASE
+                case 'RAW_DATA_FROM_PAGE':
+                    console.log(`[SW] Received ${request.source} data from content script.`);
                     if (this.sidePanelPort) {
-                        console.log('[SW-LOG] Step 6: Side panel port is connected. Forwarding data.');
                         this.sidePanelPort.postMessage({ type: 'PRINT_DATA_RECEIVED', payload: request.payload });
                     } else {
-                        console.error(`[SW-LOG] Step 6 FAILED: Side panel port is not connected. Cannot forward ${action}.`);
+                        console.error('[SW] Side panel not connected. Cannot forward print data.');
                     }
                     break;
+
+                // REMOVE OR COMMENT OUT THE OLD CASES
+                // case 'RAW_ESCPOS_DATA':
+                // case 'RAW_SERIAL_DATA':
+                // case 'RAW_BLUETOOTH_DATA':
+                // ...
 
                 case 'SIMULATE_BARCODE_SCAN':
                     console.log('[SW] Simulating barcode scan:', request.barcode);
