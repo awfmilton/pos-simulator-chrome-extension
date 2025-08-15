@@ -36,6 +36,16 @@ class PeripheralSimulatorService {
                 console.log('[SW] Side panel connected.');
 
                 // If there's data that arrived before the panel was open, send it now.
+                // Listen for messages from the side panel, including the keep-alive
+                port.onMessage.addListener((msg) => {
+                    if (msg.type === 'KEEP_ALIVE') {
+                        console.log('[SW] Received keep-alive from side panel.');
+                        return; // Just acknowledging is enough to keep alive
+                    }
+                    // For other messages, we can route them if needed in the future
+                    console.log('[SW] Received message directly from panel port:', msg);
+                });
+
                 if (this.queuedRawData.length > 0) {
                     console.log(`[SW] Sending ${this.queuedRawData.length} queued message(s) to newly connected panel.`);
                     this.queuedRawData.forEach(msg => this.sidePanelPort.postMessage(msg));
