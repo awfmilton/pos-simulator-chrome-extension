@@ -5,6 +5,7 @@ class POSSimulatorPanel {
     constructor() {
         this.currentTab = 'scanner';
         this.peripheralStates = {};
+        this.keepAliveInterval = null;
         if (typeof EscPosParser === 'undefined') {
             console.error('[PANEL] CRITICAL: EscPosParser class is not defined. Print data will not be parsed.');
             this.escposParser = null; // Ensure it's null if not loaded
@@ -176,6 +177,16 @@ class POSSimulatorPanel {
         console.log('[PANEL] Connecting to service worker...');
         const port = chrome.runtime.connect({ name: 'sidepanel' });
 
+        // Start a heartbeat to keep the service worker alive
+        this.keepAliveInterval = setInterval(() => {
+            try {
+                port.postMessage({ type: 'KEEP_ALIVE' });
+            } catch (e) {
+                console.warn('[PANEL] Keep-alive failed, port disconnected.', e);
+                clearInterval(this.keepAliveInterval);
+            }
+        }, 20000); // 20 seconds
+
         port.onMessage.addListener((message) => {
             this.handleMessage(message);
         });
@@ -183,6 +194,9 @@ class POSSimulatorPanel {
         port.onDisconnect.addListener(() => {
             console.warn('[PANEL] Disconnected from service worker.');
             this.updateConnectionStatus(false, null);
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval);
+            }
         });
 
         // Get initial state from service worker
