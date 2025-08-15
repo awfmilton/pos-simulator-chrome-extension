@@ -5,7 +5,12 @@ class POSSimulatorPanel {
     constructor() {
         this.currentTab = 'scanner';
         this.peripheralStates = {};
-        this.escposParser = new EscPosParser();
+        if (typeof EscPosParser === 'undefined') {
+            console.error('[PANEL] CRITICAL: EscPosParser class is not defined. Print data will not be parsed.');
+            this.escposParser = null; // Ensure it's null if not loaded
+        } else {
+            this.escposParser = new EscPosParser();
+        }
         this.testData = {
             barcodes: {
                 'upc-a': '012345678905',
@@ -569,21 +574,26 @@ class POSSimulatorPanel {
     }
 
     handleMessage(request) {
-        console.log('[PANEL] Received message:', request);
+        try {
+            console.log('[PANEL] Received message:', request);
 
-        // Messages from the port don't use request/response
-        const action = request.action || request.type;
+            // Messages from the port don't use request/response
+            const action = request.action || request.type;
 
-        switch (action) {
-            case 'PERIPHERAL_EVENT':
-                this.handlePeripheralEvent(request.event, request.data);
-                break;
-            case 'PRINT_DATA_RECEIVED':
-                this.handlePeripheralEvent('PRINT_DATA_RECEIVED', request); // Pass the whole message
-                break;
-            case 'LINE_DISPLAY_DATA_RECEIVED':
-                this.handlePeripheralEvent('LINE_DISPLAY_DATA_RECEIVED', request); // Pass the whole message
-                break;
+            switch (action) {
+                case 'PERIPHERAL_EVENT':
+                    this.handlePeripheralEvent(request.event, request.data);
+                    break;
+                case 'PRINT_DATA_RECEIVED':
+                    this.handlePeripheralEvent('PRINT_DATA_RECEIVED', request); // Pass the whole message
+                    break;
+                case 'LINE_DISPLAY_DATA_RECEIVED':
+                    this.handlePeripheralEvent('LINE_DISPLAY_DATA_RECEIVED', request); // Pass the whole message
+                    break;
+            }
+        } catch (e) {
+            console.error('[PANEL] Unhandled error in handleMessage:', e);
+            this.showError(`Internal Panel Error: ${e.message}`);
         }
     }
 
@@ -602,7 +612,6 @@ class POSSimulatorPanel {
                         const parser = new DOMParser();
                         const xmlDoc = parser.parseFromString(data.payload, "text/xml");
 
-                        // Check for parser errors, which can happen with malformed XML
                         const parserError = xmlDoc.querySelector('parsererror');
                         if (parserError) {
                             throw new Error(`XML Parsing Error: ${parserError.innerText}`);
@@ -611,11 +620,9 @@ class POSSimulatorPanel {
                         const textNodes = xmlDoc.getElementsByTagName('text');
                         let receiptText = '';
                         for (let i = 0; i < textNodes.length; i++) {
-                            // Re-create the line breaks that were in the original XML text nodes
                             receiptText += textNodes[i].textContent;
                         }
 
-                        // As a quality-of-life improvement, replace "Invalid Date" with the current date.
                         if (receiptText.includes('Date: Invalid Date')) {
                             const now = new Date();
                             const formattedDate = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
@@ -630,18 +637,16 @@ class POSSimulatorPanel {
                     }
 
                 } else { // Handle binary data from USB, Serial, Bluetooth
+                    if (!this.escposParser) {
+                        this.showError('Binary data received, but parser is not available.');
+                        return;
+                    }
                     try {
-                        // For debugging, log the raw hex data to see what we're receiving
                         const hexString = Array.from(new Uint8Array(data.payload)).map(b => b.toString(16).padStart(2, '0')).join(' ');
                         console.log(`[PANEL-DEBUG] Received raw binary data (${data.payload.length} bytes): ${hexString}`);
 
-                        // Ensure payload is a Uint8Array
                         const printData = new Uint8Array(data.payload);
-
-                        // Use the EscPosParser to get structured data
                         const parsedData = this.escposParser.parse(printData);
-
-                        // Use the renderer from the parser to generate HTML
                         const receiptHtml = this.escposParser.renderToHTML(parsedData);
                         const receiptContent = document.querySelector('.receipt-content');
                         receiptContent.innerHTML = receiptHtml;
