@@ -513,14 +513,23 @@ class POSSimulatorPanel {
             case 'PRINT_DATA_RECEIVED':
                 console.log('[PANEL-LOG] Step 7: Received PRINT_DATA_RECEIVED event.');
                 try {
-                    const decodedString = new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(data.payload));
-                    console.log(`[PANEL-LOG] Step 8: Decoded data (${data.payload.length} bytes) to string:`, decodedString);
+                    // The payload is an array of numbers, convert it to a Uint8Array
+                    const printData = new Uint8Array(data.payload);
+                    const decodedString = new TextDecoder("utf-8", { fatal: true }).decode(printData);
+
+                    console.log(`[PANEL-LOG] Step 8: Decoded data (${printData.length} bytes) to string.`);
                     this.displayReceipt(decodedString);
-                    console.log('[PANEL-LOG] Step 9: Called displayReceipt with decoded string.');
-                    this.logActivity('printer', `Rendered ${data.payload.length} bytes of print data.`);
+                    this.logActivity('printer', `Rendered ${printData.length} bytes of text data.`);
+
                 } catch (e) {
-                    console.error('[PANEL-LOG] Step 8 FAILED: Could not decode print data.', e);
-                    this.showError('Failed to decode print data.');
+                    console.warn('[PANEL-LOG] Step 8 FAILED: Could not decode print data as UTF-8. Assuming binary ESC/POS data.', e.message);
+                    // If decoding fails, it's likely binary data. We can't render it as a simple string.
+                    // For now, let's just log it and show a message on the receipt.
+                    const hexString = data.payload.map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    this.clearReceipt();
+                    this.displayReceipt(`Received ${data.payload.length} bytes of binary ESC/POS data.\n\nData (hex):\n${hexString}`);
+                    this.logActivity('printer', `Received ${data.payload.length} bytes of binary data.`);
+                    this.showError('Binary print data received.');
                 }
                 break;
             case 'CONNECTION_STATUS':
