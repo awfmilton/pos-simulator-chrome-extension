@@ -134,56 +134,6 @@
         gatt: null, // We'll attach this next
     };
 
-    // 2. Create the GATT server with a back-reference to the.
-        // To avoid breaking the POS app, we can either return a default or reject.
-        // Rejecting is closer to the real API behavior if no device is found/chosen.
-        return Promise.reject(new Error("No device selected."));
-    };
-
-    // --- WebSerial Interception ---
-    if (!navigator.serial) navigator.serial = {};
-    const fakeSerialPort = {
-        getInfo: () => ({ usbVendorId: 0x1234, usbProductId: 0x5678 }),
-        opened: false,
-        writable: null,
-        readable: null,
-        open: async function(options) {
-            this.opened = true;
-            this.writable = new WritableStream({
-                write(chunk) {
-                    const payloadArray = bufferSourceToByteArray(chunk);
-                    window.postMessage({
-                        type: 'POS_SIMULATOR_RAW_DATA',
-                        source: 'webserial',
-                        // We can't easily distinguish serial devices without more info,
-                        // so we'll assume a generic 'serial' type for now.
-                        deviceType: 'serial',
-                        payload: payloadArray
-                    }, '*');
-                }
-            });
-            this.readable = new ReadableStream();
-            return Promise.resolve();
-        },
-        close: async function() { this.opened = false; return Promise.resolve(); },
-    };
-    navigator.serial.requestPort = (options) => {
-        console.log('[Interceptor] Intercepted navigator.serial.requestPort with options:', options);
-        // The Web Serial API `requestPort` also has filters. We could expand this
-        // in the future if needed, but for now, we return the single fake port.
-        return Promise.resolve(fakeSerialPort);
-    };
-
-    // --- WebBluetooth Interception (Corrected) ---
-    if (!navigator.bluetooth) navigator.bluetooth = {};
-
-    // 1. Define the device first, without the gatt server
-    const fakeBluetoothDevice = {
-        id: 'FAKE_BT_DEVICE_ID',
-        name: 'Virtual Bluetooth Printer',
-        gatt: null, // We'll attach this next
-    };
-
     // 2. Create the GATT server with a back-reference to the device
     const gattServer = {
         device: fakeBluetoothDevice, // This is the required back-reference
