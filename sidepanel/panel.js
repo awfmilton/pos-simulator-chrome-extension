@@ -5,13 +5,7 @@ class POSSimulatorPanel {
     constructor() {
         this.currentTab = 'scanner';
         this.peripheralStates = {};
-        this.keepAliveInterval = null;
-        if (typeof EscPosParser === 'undefined') {
-            console.error('[PANEL] CRITICAL: EscPosParser class is not defined. Print data will not be parsed.');
-            this.escposParser = null; // Ensure it's null if not loaded
-        } else {
-            this.escposParser = new EscPosParser();
-        }
+        this.escposParser = new EscPosParser();
         this.testData = {
             barcodes: {
                 'upc-a': '012345678905',
@@ -36,7 +30,7 @@ class POSSimulatorPanel {
                 }
             }
         };
-
+        this.port = null;
         this.init();
     }
 
@@ -48,190 +42,174 @@ class POSSimulatorPanel {
     }
 
     setupEventListeners() {
-        console.log('[PANEL] Setting up event listeners...');
         // Tab navigation
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tabName = e.currentTarget.dataset.tab;
-                console.log(`[USER-ACTION] Clicked tab: ${tabName}`);
-                this.switchTab(tabName);
-            });
+            btn.addEventListener('click', (e) => this.switchTab(e.currentTarget.dataset.tab));
         });
 
+        // Printer toggles
+        document.getElementById('usb-printer-toggle').addEventListener('change', (e) => this.togglePrinter('usb', e.target.checked));
+        document.getElementById('bluetooth-printer-toggle').addEventListener('change', (e) => this.togglePrinter('bluetooth', e.target.checked));
+        document.getElementById('serial-printer-toggle').addEventListener('change', (e) => this.togglePrinter('serial', e.target.checked));
+        document.getElementById('network-printer-toggle').addEventListener('change', (e) => this.togglePrinter('network', e.target.checked));
+
         // Barcode scanner events
-        document.getElementById('scan-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Scan Barcode"');
-            this.handleBarcodeScans();
-        });
-        document.getElementById('generate-barcode-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Generate Test Barcode"');
-            this.generateTestBarcode();
-        });
+        document.getElementById('scan-btn').addEventListener('click', () => this.handleBarcodeScans());
+        document.getElementById('generate-barcode-btn').addEventListener('click', () => this.generateTestBarcode());
         document.getElementById('barcode-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                console.log('[USER-ACTION] Pressed Enter in barcode input');
-                this.handleBarcodeScans();
-            }
+            if (e.key === 'Enter') this.handleBarcodeScans();
         });
 
         // MSR events
-        document.getElementById('swipe-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Swipe Card"');
-            this.handleMSRSwipe();
-        });
-        document.getElementById('generate-card-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Generate Test Card"');
-            this.generateTestCard();
-        });
+        document.getElementById('swipe-btn').addEventListener('click', () => this.handleMSRSwipe());
+        document.getElementById('generate-card-btn').addEventListener('click', () => this.generateTestCard());
 
         // Printer events
-        document.getElementById('test-print-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Test Print"');
-            this.handleTestPrint();
-        });
-        document.getElementById('clear-receipt-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Clear Receipt"');
-            this.clearReceipt();
-        });
+        document.getElementById('test-print-btn').addEventListener('click', () => this.handleTestPrint());
+        document.getElementById('clear-receipt-btn').addEventListener('click', () => this.clearReceipt());
 
         // Cash drawer events
-        document.getElementById('open-drawer-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Open Drawer"');
-            this.handleDrawerOpen();
-        });
-        document.getElementById('close-drawer-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Close Drawer"');
-            this.handleDrawerClose();
-        });
+        document.getElementById('open-drawer-btn').addEventListener('click', () => this.handleDrawerOpen());
+        document.getElementById('close-drawer-btn').addEventListener('click', () => this.handleDrawerClose());
 
         // Scale events
         document.getElementById('weight-input').addEventListener('input', (e) => this.updateWeight(e.target.value));
         document.getElementById('weight-slider-input').addEventListener('input', (e) => this.updateWeight(e.target.value));
-        document.getElementById('weight-unit-select').addEventListener('change', (e) => {
-            console.log(`[USER-ACTION] Changed weight unit to: ${e.target.value}`);
-            this.updateWeightUnit(e.target.value);
-        });
-        document.getElementById('tare-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Tare"');
-            this.tareScale();
-        });
-        document.getElementById('zero-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Zero"');
-            this.zeroScale();
-        });
+        document.getElementById('weight-unit-select').addEventListener('change', (e) => this.updateWeightUnit(e.target.value));
+        document.getElementById('tare-btn').addEventListener('click', () => this.tareScale());
+        document.getElementById('zero-btn').addEventListener('click', () => this.zeroScale());
 
         // Line display events
-        document.getElementById('update-display-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Update Display"');
-            this.updateLineDisplay();
-        });
-        document.getElementById('clear-display-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Clear Display"');
-            this.clearLineDisplay();
-        });
+        document.getElementById('update-display-btn').addEventListener('click', () => this.updateLineDisplay());
+        document.getElementById('clear-display-btn').addEventListener('click', () => this.clearLineDisplay());
         document.getElementById('line1-input').addEventListener('input', (e) => this.updateDisplayPreview());
         document.getElementById('line2-input').addEventListener('input', (e) => this.updateDisplayPreview());
 
         // Global controls
-        document.getElementById('reset-all-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Reset All"');
-            this.resetAll();
-        });
-        document.getElementById('settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Settings"');
-            this.showSettings();
-        });
+        document.getElementById('reset-all-btn').addEventListener('click', () => this.resetAll());
+        document.getElementById('settings-btn').addEventListener('click', () => this.showSettings());
 
         // Settings modal
-        document.getElementById('close-settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Close Settings"');
-            this.hideSettings();
-        });
-        document.getElementById('save-settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Save Settings"');
-            this.saveSettings();
-        });
-        document.getElementById('cancel-settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Cancel Settings"');
-            this.hideSettings();
-        });
+        document.getElementById('close-settings-btn').addEventListener('click', () => this.hideSettings());
+        document.getElementById('save-settings-btn').addEventListener('click', () => this.saveSettings());
+        document.getElementById('cancel-settings-btn').addEventListener('click', () => this.hideSettings());
     }
 
+
     initializeUI() {
-        // Set initial values
-        document.getElementById('barcode-format').value = 'upc-a';
-        document.getElementById('card-type').value = 'credit';
-        document.getElementById('printer-model').value = 'epson';
-        document.getElementById('weight-unit-select').value = 'lbs';
-        document.getElementById('drawer-interface').value = 'printer';
-
-        // Initialize status indicators
-        this.updateStatusIndicators();
-        this.updateConnectionStatus(false, null); // Set initial state to disconnected
-
-        // Load saved settings
+        this.updateConnectionStatus(false, null);
         this.loadSettings();
     }
 
     connectToServiceWorker() {
-        console.log('[PANEL] Connecting to service worker...');
-        const port = chrome.runtime.connect({ name: 'sidepanel' });
-
-        // Start a heartbeat to keep the service worker alive
-        this.keepAliveInterval = setInterval(() => {
-            try {
-                port.postMessage({ type: 'KEEP_ALIVE' });
-            } catch (e) {
-                console.warn('[PANEL] Keep-alive failed, port disconnected.', e);
-                clearInterval(this.keepAliveInterval);
-            }
-        }, 20000); // 20 seconds
-
-        port.onMessage.addListener((message) => {
-            this.handleMessage(message);
-        });
-
-        port.onDisconnect.addListener(() => {
-            console.warn('[PANEL] Disconnected from service worker.');
+        this.port = chrome.runtime.connect({ name: 'sidepanel' });
+        this.port.onMessage.addListener((msg) => this.handlePortMessage(msg));
+        this.port.onDisconnect.addListener(() => {
+            this.port = null;
             this.updateConnectionStatus(false, null);
-            if (this.keepAliveInterval) {
-                clearInterval(this.keepAliveInterval);
-            }
         });
 
-        // Get initial state from service worker
-        this.sendMessage('GET_STATE').then(response => {
-            if (response && response.success) {
-                console.log('[PANEL] Initial state received:', response.data);
-                this.peripheralStates = response.data;
-                this.updateUIFromState();
-            }
-        }).catch(error => console.error('[PANEL] Error getting initial state:', error));
-
-        // Get initial connection status
-        this.sendMessage('GET_CONNECTION_STATUS').then(response => {
-            if (response && response.success) {
-                console.log('[PANEL] Initial connection status:', response);
-                this.updateConnectionStatus(response.connected, response.url);
-            }
-        }).catch(error => console.error('[PANEL] Error getting connection status:', error));
+        // Check connection status every 2 seconds
+        setInterval(() => this.sendMessage('CHECK_CONNECTION'), 2000);
     }
 
+    handlePortMessage(msg) {
+        switch (msg.type) {
+            case 'PRINTER_STATE_UPDATE':
+                this.updatePrinterStateUI(msg.printerType, msg.state);
+                break;
+            case 'CONNECTION_STATUS':
+                this.updateConnectionStatus(msg.data.connected, msg.data.url);
+                break;
+            case 'PRINT_DATA_RECEIVED':
+                this.handlePrintData(msg.payload, msg.deviceType);
+                this.flashPrinterIndicator(msg.deviceType);
+                break;
+        }
+    }
+
+    flashPrinterIndicator(deviceType) {
+        let indicatorId;
+        switch (deviceType) {
+            case 'webusb':
+                indicatorId = 'usb-printer-status';
+                break;
+            case 'webbluetooth':
+                 indicatorId = 'bluetooth-printer-status';
+                 break;
+            case 'webserial':
+                indicatorId = 'serial-printer-status';
+                break;
+            case 'network':
+                indicatorId = 'network-printer-status';
+                break;
+            default:
+                return;
+        }
+
+        const indicator = document.getElementById(indicatorId);
+        if (indicator) {
+            indicator.classList.add('transmitting');
+            setTimeout(() => indicator.classList.remove('transmitting'), 500);
+        }
+    }
+
+    handlePrintData(data, deviceType) {
+        if (deviceType === 'network-printer' && typeof data === 'string') {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(data, "text/xml");
+            const textNodes = xmlDoc.getElementsByTagName('text');
+            let receiptText = '';
+            for (let i = 0; i < textNodes.length; i++) {
+                receiptText += textNodes[i].textContent;
+            }
+            this.displayReceipt(receiptText);
+        } else {
+            const parsedData = this.escposParser.parse(new Uint8Array(data));
+            const receiptHtml = this.escposParser.renderToHTML(parsedData);
+            document.querySelector('.receipt-content').innerHTML = receiptHtml;
+        }
+    }
+
+    togglePrinter(printerType, isEnabled) {
+        this.sendMessage('TOGGLE_PRINTER', { printerType, isEnabled });
+    }
+
+    updatePrinterStateUI(printerType, state) {
+        const toggle = document.getElementById(`${printerType}-printer-toggle`);
+        const statusLight = document.getElementById(`${printerType}-printer-status`);
+
+        if (toggle) toggle.checked = state.on;
+        if (statusLight) {
+            statusLight.classList.toggle('connected', state.on);
+        }
+    }
+
+
     switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tabName);
-        });
-
-        // Update tab panels
-        document.querySelectorAll('.tab-panel').forEach(panel => {
-            panel.classList.toggle('active', panel.id === `${tabName}-panel`);
-        });
-
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+        document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.toggle('active', panel.id === `${tabName}-panel`));
         this.currentTab = tabName;
     }
 
-    // Barcode Scanner Methods
+    async sendMessage(type, data) {
+        if (this.port) {
+            this.port.postMessage({ type, data });
+        } else {
+            console.error("Port not connected");
+        }
+    }
+
+    updateConnectionStatus(connected, url) {
+        const indicator = document.getElementById('connection-indicator');
+        const text = document.getElementById('connection-status-text');
+
+        indicator.classList.toggle('connected', connected);
+        indicator.classList.toggle('disconnected', !connected);
+        text.textContent = connected ? `Connected to ${new URL(url).hostname}` : 'Disconnected';
+    }
+
+    // Existing methods (handleBarcodeScans, generateTestBarcode, etc.) go here...
     async handleBarcodeScans() {
         const barcodeInput = document.getElementById('barcode-input');
         const formatSelect = document.getElementById('barcode-format');
@@ -325,22 +303,10 @@ class POSSimulatorPanel {
 
     // Printer Methods
     async handleTestPrint() {
-        const printerModel = document.getElementById('printer-model').value;
-        const autoCut = document.getElementById('auto-cut').checked;
-        const drawerKick = document.getElementById('drawer-kick').checked;
-
         this.updateStatus('Printing test receipt...');
-
         const testReceipt = this.generateTestReceipt();
-
         try {
-            await this.sendMessage('PRINT_RECEIPT', {
-                model: printerModel,
-                data: testReceipt,
-                autoCut: autoCut,
-                drawerKick: drawerKick
-            });
-
+            await this.sendMessage('PRINT_RECEIPT', { data: testReceipt });
             this.displayReceipt(testReceipt);
             this.logActivity('printer', 'Test receipt printed');
             this.updateStatus('Test receipt printed');
@@ -427,7 +393,6 @@ class POSSimulatorPanel {
         document.getElementById('weight-input').value = weightValue;
         document.getElementById('weight-slider-input').value = weightValue;
 
-        // Update scale status
         const stableIndicator = document.getElementById('stable-indicator');
         const zeroIndicator = document.getElementById('zero-indicator');
 
@@ -443,10 +408,7 @@ class POSSimulatorPanel {
 
     updateWeightUnit(unit) {
         document.getElementById('weight-unit').textContent = unit;
-
-        this.sendMessage('UPDATE_SCALE', {
-            unit: unit
-        });
+        this.sendMessage('UPDATE_SCALE', { unit: unit });
     }
 
     tareScale() {
@@ -464,284 +426,47 @@ class POSSimulatorPanel {
     updateLineDisplay() {
         const line1 = document.getElementById('line1-input').value;
         const line2 = document.getElementById('line2-input').value;
-
-        document.getElementById('display-line1').textContent = line1.padEnd(20).substring(0, 20);
-        document.getElementById('display-line2').textContent = line2.padEnd(20).substring(0, 20);
-
-        this.sendMessage('UPDATE_DISPLAY', {
-            line1: line1,
-            line2: line2
-        });
-
+        this.updateDisplayPreview();
+        this.sendMessage('UPDATE_DISPLAY', { line1, line2 });
         this.logActivity('display', `Display updated: "${line1}" / "${line2}"`);
     }
 
     updateDisplayPreview() {
         const line1 = document.getElementById('line1-input').value;
         const line2 = document.getElementById('line2-input').value;
-
-        document.getElementById('display-line1').textContent = line1.padEnd(20).substring(0, 20);
-        document.getElementById('display-line2').textContent = line2.padEnd(20).substring(0, 20);
-    }
-
-    updateLineDisplayFromData(payload) {
-        // A simple parser for VFD/LCD line display commands.
-        // It handles clear screen, cursor positioning, and printable text.
-        const line1El = document.getElementById('display-line1');
-        const line2El = document.getElementById('display-line2');
-        let text1 = line1El.textContent.trimEnd();
-        let text2 = line2El.textContent.trimEnd();
-        let currentLine = 1;
-
-        // Common command constants
-        const CMD_CLEAR_SCREEN = 0x0C; // Form Feed
-        const CMD_HOME = 0x0B; // Vertical Tab (often homes cursor)
-        const CMD_NEW_LINE = 0x0A; // Line Feed
-        const CMD_CARRIAGE_RETURN = 0x0D; // Carriage Return
-
-        let i = 0;
-        while (i < payload.length) {
-            const byte = payload[i];
-
-            if (byte === CMD_CLEAR_SCREEN) {
-                text1 = '';
-                text2 = '';
-                currentLine = 1;
-                i++;
-                continue;
-            }
-
-            if (byte === CMD_HOME) {
-                currentLine = 1;
-                i++;
-                continue;
-            }
-
-            if (byte === CMD_CARRIAGE_RETURN) {
-                if (currentLine === 1) text1 = '';
-                else text2 = '';
-                i++;
-                continue;
-            }
-
-            if (byte === CMD_NEW_LINE) {
-                currentLine = 2;
-                i++;
-                continue;
-            }
-
-            // Basic ESC positioning (e.g., ESC c k for select line k)
-            // This is a guess, but covers some devices.
-            if (byte === 0x1B && payload[i+1] === 0x63 && payload[i+2]) {
-                const lineNumber = payload[i+2];
-                if (lineNumber === 1 || lineNumber === 49) { // '1'
-                    currentLine = 1;
-                } else if (lineNumber === 2 || lineNumber === 50) { // '2'
-                    currentLine = 2;
-                }
-                i += 3;
-                continue;
-            }
-
-            // Printable ASCII characters
-            if (byte >= 32 && byte <= 126) {
-                const char = String.fromCharCode(byte);
-                if (currentLine === 1) {
-                    text1 += char;
-                } else {
-                    text2 += char;
-                }
-            }
-            i++;
-        }
-
-        // Update the UI, ensuring it's exactly 20 characters
-        line1El.textContent = text1.padEnd(20).substring(0, 20);
-        line2El.textContent = text2.padEnd(20).substring(0, 20);
-
-        this.logActivity('display', `Rendered ${payload.length} bytes of data.`);
+        document.getElementById('display-line1').textContent = line1.padEnd(20, ' ').substring(0, 20);
+        document.getElementById('display-line2').textContent = line2.padEnd(20, ' ').substring(0, 20);
     }
 
     clearLineDisplay() {
         document.getElementById('line1-input').value = '';
         document.getElementById('line2-input').value = '';
-        document.getElementById('display-line1').textContent = ''.padEnd(20);
-        document.getElementById('display-line2').textContent = ''.padEnd(20);
-
+        this.updateDisplayPreview();
         this.sendMessage('UPDATE_DISPLAY', { line1: '', line2: '' });
         this.logActivity('display', 'Display cleared');
     }
 
     // Utility Methods
-    async sendMessage(action, data = {}) {
-        return new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({ action, data }, (response) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                } else if (response && response.success) {
-                    resolve(response);
-                } else {
-                    reject(new Error(response ? response.error : 'Unknown error'));
-                }
-            });
-        });
-    }
-
-    handleMessage(request) {
-        try {
-            console.log('[PANEL] Received message:', request);
-
-            // Messages from the port don't use request/response
-            const action = request.action || request.type;
-
-            switch (action) {
-                case 'PERIPHERAL_EVENT':
-                    this.handlePeripheralEvent(request.event, request.data);
-                    break;
-                case 'PRINT_DATA_RECEIVED':
-                    this.handlePeripheralEvent('PRINT_DATA_RECEIVED', request); // Pass the whole message
-                    break;
-                case 'LINE_DISPLAY_DATA_RECEIVED':
-                    this.handlePeripheralEvent('LINE_DISPLAY_DATA_RECEIVED', request); // Pass the whole message
-                    break;
-            }
-        } catch (e) {
-            console.error('[PANEL] Unhandled error in handleMessage:', e);
-            this.showError(`Internal Panel Error: ${e.message}`);
-        }
-    }
-
-    handlePeripheralEvent(event, data) {
-        console.log(`[PANEL] Handling peripheral event: ${event}`, data);
-        switch (event) {
-            case 'LINE_DISPLAY_DATA_RECEIVED':
-                this.updateLineDisplayFromData(data.payload);
-                break;
-            case 'PRINT_DATA_RECEIVED':
-                console.log(`[PANEL-LOG] Step 7: Received PRINT_DATA_RECEIVED event for device type: ${data.deviceType}`);
-
-                // Handle XML data from network ePOS printers
-                if (data.deviceType === 'network-printer' && typeof data.payload === 'string') {
-                    try {
-                        const parser = new DOMParser();
-                        const xmlDoc = parser.parseFromString(data.payload, "text/xml");
-
-                        const parserError = xmlDoc.querySelector('parsererror');
-                        if (parserError) {
-                            throw new Error(`XML Parsing Error: ${parserError.innerText}`);
-                        }
-
-                        const textNodes = xmlDoc.getElementsByTagName('text');
-                        let receiptText = '';
-                        for (let i = 0; i < textNodes.length; i++) {
-                            receiptText += textNodes[i].textContent;
-                        }
-
-                        if (receiptText.includes('Date: Invalid Date')) {
-                            const now = new Date();
-                            const formattedDate = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
-                            receiptText = receiptText.replace('Date: Invalid Date', `Date: ${formattedDate}`);
-                        }
-
-                        this.displayReceipt(receiptText);
-                        this.logActivity('printer', `Rendered XML receipt from network printer.`);
-                    } catch (e) {
-                        this.showError(`Failed to parse ePOS XML: ${e.message}`);
-                        this.displayReceipt(`--- ERROR ---\nFailed to parse XML receipt:\n${e.message}\n\n--- RAW DATA ---\n${data.payload}`);
-                    }
-
-                } else { // Handle binary data from USB, Serial, Bluetooth
-                    if (!this.escposParser) {
-                        this.showError('Binary data received, but parser is not available.');
-                        return;
-                    }
-                    try {
-                        const hexString = Array.from(new Uint8Array(data.payload)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                        console.log(`[PANEL-DEBUG] Received raw binary data (${data.payload.length} bytes): ${hexString}`);
-
-                        const printData = new Uint8Array(data.payload);
-                        const parsedData = this.escposParser.parse(printData);
-                        const receiptHtml = this.escposParser.renderToHTML(parsedData);
-                        const receiptContent = document.querySelector('.receipt-content');
-                        receiptContent.innerHTML = receiptHtml;
-
-                        this.logActivity('printer', `Rendered ${printData.length} bytes of binary ESC/POS data.`);
-
-                    } catch (e) {
-                        console.warn('[PANEL-LOG] Step 8 FAILED: Could not process binary print data.', e.message);
-                        const hexString = Array.from(new Uint8Array(data.payload)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                        this.clearReceipt();
-                        this.displayReceipt(`Received ${data.payload.length} bytes of unhandled binary data.\n\nData (hex):\n${hexString}`);
-                        this.logActivity('printer', `Received ${data.payload.length} bytes of unhandled binary data.`);
-                        this.showError('Unhandled binary print data received.');
-                    }
-                }
-                break;
-            case 'CONNECTION_STATUS':
-                this.updateConnectionStatus(data.connected, data.url);
-                break;
-            case 'SCAN_COMPLETE':
-                // Handle scan completion
-                break;
-            case 'PRINT_COMPLETE':
-                if (data.renderedContent) {
-                    this.displayReceipt(data.renderedContent.lines.map(l => l.text).join('\n'));
-                }
-                break;
-            case 'DRAWER_OPENED':
-                this.updateDrawerVisual(true);
-                break;
-            case 'DRAWER_CLOSED':
-                this.updateDrawerVisual(false);
-                break;
-        }
-    }
-
     logActivity(peripheral, message) {
         const logElement = document.querySelector(`#${peripheral}-log .log-content`);
         if (logElement) {
             const timestamp = new Date().toLocaleTimeString();
             const entry = document.createElement('div');
             entry.className = 'log-entry';
-            entry.innerHTML = `
-                <span class="log-timestamp">${timestamp}</span> - ${message}
-            `;
-
+            entry.innerHTML = `<span class="log-timestamp">${timestamp}</span> - ${message}`;
             logElement.insertBefore(entry, logElement.firstChild);
-
-            // Keep only last 10 entries
-            while (logElement.children.length > 10) {
+            if (logElement.children.length > 10) {
                 logElement.removeChild(logElement.lastChild);
             }
         }
     }
 
     updateStatus(message) {
-        document.getElementById('status-text').textContent = message;
-
+        const statusText = document.getElementById('status-text');
+        statusText.textContent = message;
         setTimeout(() => {
-            document.getElementById('status-text').textContent = 'System Ready';
+            statusText.textContent = 'System Ready';
         }, 3000);
-    }
-
-    updateConnectionStatus(connected, url) {
-        const statusEl = document.getElementById('connection-status');
-        if (connected && url) {
-            try {
-                statusEl.textContent = `🔗 Connected to ${new URL(url).hostname}`;
-                statusEl.classList.add('connected');
-                statusEl.classList.remove('disconnected');
-            } catch (e) {
-                console.error(`[PANEL] Invalid URL provided to updateConnectionStatus: ${url}`, e);
-                statusEl.textContent = '⚠️ Invalid URL';
-                statusEl.classList.add('disconnected');
-                statusEl.classList.remove('connected');
-            }
-        } else {
-            statusEl.textContent = '🔌 Disconnected';
-            statusEl.classList.add('disconnected');
-            statusEl.classList.remove('connected');
-        }
     }
 
     showError(message) {
@@ -749,53 +474,14 @@ class POSSimulatorPanel {
         console.error('[PANEL] Error:', message);
     }
 
-    updateStatusIndicators() {
-        const indicators = ['scanner', 'msr', 'printer', 'drawer', 'scale', 'display'];
-        indicators.forEach(indicator => {
-            const element = document.getElementById(`${indicator}-status`);
-            if (element) {
-                element.style.backgroundColor = '#10b981'; // Green
-            }
-        });
-    }
-
-    updateUIFromState() {
-        // Update UI elements based on peripheral states
-        if (this.peripheralStates.scale) {
-            this.updateWeight(this.peripheralStates.scale.weight);
-        }
-
-        if (this.peripheralStates.display) {
-            document.getElementById('line1-input').value = this.peripheralStates.display.line1;
-            document.getElementById('line2-input').value = this.peripheralStates.display.line2;
-            this.updateDisplayPreview();
-        }
-
-        if (this.peripheralStates.drawer) {
-            this.updateDrawerVisual(this.peripheralStates.drawer.open);
-        }
-    }
-
-    // Global Methods
     resetAll() {
         if (confirm('Are you sure you want to reset all peripherals?')) {
-            // Reset all inputs and displays
-            document.getElementById('barcode-input').value = '';
-            document.getElementById('track1-input').value = '';
-            document.getElementById('track2-input').value = '';
-            document.getElementById('line1-input').value = '';
-            document.getElementById('line2-input').value = '';
-
+            ['barcode-input', 'track1-input', 'track2-input', 'line1-input', 'line2-input'].forEach(id => document.getElementById(id).value = '');
             this.updateWeight(0);
             this.clearReceipt();
             this.clearLineDisplay();
             this.updateDrawerVisual(false);
-
-            // Clear all logs
-            document.querySelectorAll('.log-content').forEach(log => {
-                log.innerHTML = '';
-            });
-
+            document.querySelectorAll('.log-content').forEach(log => log.innerHTML = '');
             this.updateStatus('All peripherals reset');
         }
     }
@@ -814,10 +500,10 @@ class POSSimulatorPanel {
             debugMode: document.getElementById('debug-mode').checked,
             autoDetectInputs: document.getElementById('auto-detect-inputs').checked
         };
-
         chrome.storage.local.set({ posSimulatorSettings: settings }, () => {
             this.updateStatus('Settings saved');
             this.hideSettings();
+            this.sendMessage('SETTINGS_UPDATED', settings);
         });
     }
 
@@ -833,7 +519,6 @@ class POSSimulatorPanel {
     }
 }
 
-// Initialize the panel when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.posSimulator = new POSSimulatorPanel();
 });
