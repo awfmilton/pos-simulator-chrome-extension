@@ -72,17 +72,103 @@ class POSContentScript {
     }
 
     injectInput(data) {
-        const target = this.lastFocusedElement || document.activeElement;
-        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-            target.value = data.value;
-            target.dispatchEvent(new Event('input', { bubbles: true }));
-            target.dispatchEvent(new Event('change', { bubbles: true }));
-            if (data.simulateEnter) {
-                target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
-            }
-        } else {
-            console.warn('[CS] No focused input element found to inject data.');
+        console.log('[CS] Attempting to inject input:', data);
+        const targetElement = this.findTargetElement(data.type);
+
+        if (!targetElement) {
+            console.error('[CS] INJECTION FAILED: No suitable target element found for input injection.');
+            return false;
         }
+
+        console.log('[CS] Injecting input into:', targetElement);
+
+        targetElement.value = data.value;
+        targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+        targetElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+        if (data.simulateEnter) {
+            setTimeout(() => {
+                 targetElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+            }, 100);
+        }
+        return true;
+    }
+
+    findTargetElement(inputType) {
+        console.log('[CS] Finding target element for input type:', inputType);
+        const strategies = [
+            { name: 'lastFocusedElement', fn: () => this.lastFocusedElement },
+            { name: 'activeElement', fn: () => document.activeElement },
+            { name: 'findByInputType', fn: () => this.findByInputType(inputType) },
+            { name: 'findFirstVisibleInput', fn: () => this.findFirstVisibleInput() }
+        ];
+
+        for (const strategy of strategies) {
+            const element = strategy.fn();
+            console.log(`[CS] Trying strategy '${strategy.name}': found element`, element);
+            if (element && this.isInputElement(element) && this.isElementVisible(element)) {
+                console.log(`[CS] Strategy '${strategy.name}': SUCCESS. Using element:`, element);
+                return element;
+            }
+        }
+        console.warn('[CS] All target-finding strategies failed.');
+        return null;
+    }
+
+    isInputElement(element) {
+        if (!element) return false;
+        const tagName = element.tagName.toLowerCase();
+        const inputTypes = ['text', 'number', 'search', 'tel', 'url', 'email', 'password', ''];
+        return (
+            (tagName === 'input' && inputTypes.includes(element.type || '')) ||
+            tagName === 'textarea' ||
+            element.isContentEditable
+        );
+    }
+
+    isElementVisible(element) {
+        if (!element) return false;
+        const style = window.getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetWidth > 0 && element.offsetHeight > 0;
+    }
+
+    findByInputType(inputType) {
+        const typeMap = {
+            'barcode': ['barcode', 'scan', 'product', 'sku', 'item'],
+            'msr': ['card', 'magnetic', 'stripe', 'msr', 'payment'],
+            'general': ['input', 'data', 'value']
+        };
+        const keywords = typeMap[inputType] || typeMap['general'];
+        for (const keyword of keywords) {
+            const selectors = [
+                `input[placeholder*="${keyword}" i]`,
+                `input[id*="${keyword}" i]`,
+                `input[name*="${keyword}" i]`,
+                `input[class*="${keyword}" i]`,
+                `textarea[placeholder*="${keyword}" i]`,
+                `textarea[id*="${keyword}" i]`,
+                `textarea[name*="${keyword}" i]`,
+                `textarea[class*="${keyword}" i]`
+            ];
+            for (const selector of selectors) {
+                const element = document.querySelector(selector);
+                if (element && this.isElementVisible(element)) {
+                    console.log(`[CS] Found element with selector '${selector}' via keyword '${keyword}'`);
+                    return element;
+                }
+            }
+        }
+        return null;
+    }
+
+    findFirstVisibleInput() {
+        const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input:not([type]), textarea');
+        for (const input of inputs) {
+            if (this.isElementVisible(input) && !input.disabled && !input.readOnly) {
+                return input;
+            }
+        }
+        return null;
     }
 }
 
