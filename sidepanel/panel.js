@@ -500,9 +500,11 @@ class POSSimulatorPanel {
             case 'PERIPHERAL_EVENT':
                 this.handlePeripheralEvent(request.event, request.data);
                 break;
-            // The service worker now sends PRINT_DATA_RECEIVED directly to the port
             case 'PRINT_DATA_RECEIVED':
                 this.handlePeripheralEvent('PRINT_DATA_RECEIVED', { payload: request.payload });
+                break;
+            case 'LINE_DISPLAY_DATA_RECEIVED':
+                this.handlePeripheralEvent('LINE_DISPLAY_DATA_RECEIVED', { payload: request.payload });
                 break;
         }
     }
@@ -510,6 +512,9 @@ class POSSimulatorPanel {
     handlePeripheralEvent(event, data) {
         console.log(`[PANEL] Handling peripheral event: ${event}`, data);
         switch (event) {
+            case 'LINE_DISPLAY_DATA_RECEIVED':
+                this.updateLineDisplayFromData(data.payload);
+                break;
             case 'PRINT_DATA_RECEIVED':
                 console.log('[PANEL-LOG] Step 7: Received PRINT_DATA_RECEIVED event.');
                 try {

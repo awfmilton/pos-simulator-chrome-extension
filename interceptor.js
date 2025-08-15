@@ -19,34 +19,75 @@
 
     // --- WebUSB Interception ---
     if (!navigator.usb) navigator.usb = {};
-    const fakeUsbDevice = {
-        vendorId: 0x04b8,
-        productId: 0x0202,
-        productName: 'Virtual ESC/POS Printer',
-        opened: false,
-        open: async () => { console.log('[Interceptor] FAKE USB.open'); return Promise.resolve(); },
-        close: async () => { console.log('[Interceptor] FAKE USB.close'); return Promise.resolve(); },
-        selectConfiguration: async () => { console.log('[Interceptor] FAKE USB.selectConfiguration'); return Promise.resolve(); },
-        claimInterface: async () => { console.log('[Interceptor] FAKE USB.claimInterface'); return Promise.resolve(); },
-        releaseInterface: async () => { console.log('[Interceptor] FAKE USB.releaseInterface'); return Promise.resolve(); },
-        reset: async () => { console.log('[Interceptor] FAKE USB.reset'); return Promise.resolve(); },
-
-        transferOut: async function(endpointNumber, data) {
-            console.log(`[Interceptor] FAKE USB.transferOut called with ${data.byteLength} bytes.`);
-            const payloadArray = bufferSourceToByteArray(data);
-
-            window.postMessage({
-                type: 'POS_SIMULATOR_RAW_DATA',
-                source: 'webusb',
-                payload: payloadArray
-            }, '*');
-
-            return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
+    const devices = {
+        printer: {
+            vendorId: 0x04b8, // Epson
+            productId: 0x0202,
+            productName: 'Virtual ESC/POS Printer',
+            opened: false,
+            open: async () => { console.log('[Interceptor] FAKE PRINTER.open'); return Promise.resolve(); },
+            close: async () => { console.log('[Interceptor] FAKE PRINTER.close'); return Promise.resolve(); },
+            selectConfiguration: async () => { console.log('[Interceptor] FAKE PRINTER.selectConfiguration'); return Promise.resolve(); },
+            claimInterface: async () => { console.log('[Interceptor] FAKE PRINTER.claimInterface'); return Promise.resolve(); },
+            transferOut: async function(endpointNumber, data) {
+                console.log(`[Interceptor] FAKE PRINTER.transferOut with ${data.byteLength} bytes.`);
+                const payloadArray = bufferSourceToByteArray(data);
+                window.postMessage({
+                    type: 'POS_SIMULATOR_RAW_DATA',
+                    source: 'webusb',
+                    deviceType: 'printer',
+                    payload: payloadArray
+                }, '*');
+                return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
+            },
         },
+        lineDisplay: {
+            vendorId: 0x1504, // Logic Controls (Bematech)
+            productId: 0x0006,
+            productName: 'Virtual Line Display',
+            opened: false,
+            open: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.open'); return Promise.resolve(); },
+            close: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.close'); return Promise.resolve(); },
+            selectConfiguration: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.selectConfiguration'); return Promise.resolve(); },
+            claimInterface: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.claimInterface'); return Promise.resolve(); },
+            transferOut: async function(endpointNumber, data) {
+                console.log(`[Interceptor] FAKE LINEDISPLAY.transferOut with ${data.byteLength} bytes.`);
+                const payloadArray = bufferSourceToByteArray(data);
+                window.postMessage({
+                    type: 'POS_SIMULATOR_RAW_DATA',
+                    source: 'webusb',
+                    deviceType: 'line-display',
+                    payload: payloadArray
+                }, '*');
+                return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
+            },
+        }
     };
-    navigator.usb.requestDevice = () => {
-        console.log('[Interceptor] Intercepted navigator.usb.requestDevice');
-        return Promise.resolve(fakeUsbDevice);
+
+    navigator.usb.requestDevice = async (options) => {
+        console.log('[Interceptor] Intercepted navigator.usb.requestDevice with options:', options);
+
+        if (!options || !options.filters || options.filters.length === 0) {
+            console.warn('[Interceptor] requestDevice called with no filters. Returning default printer.');
+            // This behavior is for backward compatibility or general requests.
+            return Promise.resolve(devices.printer);
+        }
+
+        for (const filter of options.filters) {
+            if (filter.vendorId === devices.lineDisplay.vendorId) {
+                console.log('[Interceptor] Line Display requested. Returning virtual line display.');
+                return Promise.resolve(devices.lineDisplay);
+            }
+            if (filter.vendorId === devices.printer.vendorId) {
+                console.log('[Interceptor] Printer requested. Returning virtual printer.');
+                return Promise.resolve(devices.printer);
+            }
+        }
+
+        console.error('[Interceptor] No matching device found for filters:', options.filters);
+        // To avoid breaking the POS app, we can either return a default or reject.
+        // Rejecting is closer to the real API behavior if no device is found/chosen.
+        return Promise.reject(new Error("No device selected."));
     };
 
     // --- WebSerial Interception ---
@@ -64,6 +105,9 @@
                     window.postMessage({
                         type: 'POS_SIMULATOR_RAW_DATA',
                         source: 'webserial',
+                        // We can't easily distinguish serial devices without more info,
+                        // so we'll assume a generic 'serial' type for now.
+                        deviceType: 'serial',
                         payload: payloadArray
                     }, '*');
                 }
@@ -73,8 +117,60 @@
         },
         close: async function() { this.opened = false; return Promise.resolve(); },
     };
-    navigator.serial.requestPort = () => {
-        console.log('[Interceptor] Intercepted navigator.serial.requestPort');
+    navigator.serial.requestPort = (options) => {
+        console.log('[Interceptor] Intercepted navigator.serial.requestPort with options:', options);
+        // The Web Serial API `requestPort` also has filters. We could expand this
+        // in the future if needed, but for now, we return the single fake port.
+        return Promise.resolve(fakeSerialPort);
+    };
+
+    // --- WebBluetooth Interception (Corrected) ---
+    if (!navigator.bluetooth) navigator.bluetooth = {};
+
+    // 1. Define the device first, without the gatt server
+    const fakeBluetoothDevice = {
+        id: 'FAKE_BT_DEVICE_ID',
+        name: 'Virtual Bluetooth Printer',
+        gatt: null, // We'll attach this next
+    };
+
+    // 2. Create the GATT server with a back-reference to the.
+        // To avoid breaking the POS app, we can either return a default or reject.
+        // Rejecting is closer to the real API behavior if no device is found/chosen.
+        return Promise.reject(new Error("No device selected."));
+    };
+
+    // --- WebSerial Interception ---
+    if (!navigator.serial) navigator.serial = {};
+    const fakeSerialPort = {
+        getInfo: () => ({ usbVendorId: 0x1234, usbProductId: 0x5678 }),
+        opened: false,
+        writable: null,
+        readable: null,
+        open: async function(options) {
+            this.opened = true;
+            this.writable = new WritableStream({
+                write(chunk) {
+                    const payloadArray = bufferSourceToByteArray(chunk);
+                    window.postMessage({
+                        type: 'POS_SIMULATOR_RAW_DATA',
+                        source: 'webserial',
+                        // We can't easily distinguish serial devices without more info,
+                        // so we'll assume a generic 'serial' type for now.
+                        deviceType: 'serial',
+                        payload: payloadArray
+                    }, '*');
+                }
+            });
+            this.readable = new ReadableStream();
+            return Promise.resolve();
+        },
+        close: async function() { this.opened = false; return Promise.resolve(); },
+    };
+    navigator.serial.requestPort = (options) => {
+        console.log('[Interceptor] Intercepted navigator.serial.requestPort with options:', options);
+        // The Web Serial API `requestPort` also has filters. We could expand this
+        // in the future if needed, but for now, we return the single fake port.
         return Promise.resolve(fakeSerialPort);
     };
 
@@ -113,6 +209,7 @@
                             window.postMessage({
                                 type: 'POS_SIMULATOR_RAW_DATA',
                                 source: 'webbluetooth',
+                                deviceType: 'bluetooth-printer',
                                 payload: payloadArray
                             }, '*');
                             return Promise.resolve();
@@ -127,8 +224,10 @@
     fakeBluetoothDevice.gatt = gattServer;
 
     // 4. Intercept the requestDevice call
-    navigator.bluetooth.requestDevice = () => {
-        console.log('[Interceptor] Intercepted navigator.bluetooth.requestDevice');
+    navigator.bluetooth.requestDevice = (options) => {
+        console.log('[Interceptor] Intercepted navigator.bluetooth.requestDevice with options:', options);
+        // Bluetooth filtering can be complex. For now, we'll return the single
+        // fake printer device regardless of the filter.
         return Promise.resolve(fakeBluetoothDevice);
     };
 
