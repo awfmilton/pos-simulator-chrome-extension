@@ -163,6 +163,14 @@
                                 payload: payloadArray
                             }, '*');
                             return Promise.resolve();
+                        },
+                        writeValueWithResponse: async function(value) {
+                            console.log(`[Interceptor] FAKE BT Char.writeValueWithResponse with ${value.byteLength} bytes`);
+                            return this.writeValue(value);
+                        },
+                        writeValueWithoutResponse: async function(value) {
+                            console.log(`[Interceptor] FAKE BT Char.writeValueWithoutResponse with ${value.byteLength} bytes`);
+                            return this.writeValue(value);
                         }
                     });
                 }
