@@ -4,10 +4,22 @@
 (function() {
     console.log('[interceptor.js] Running in main world.');
 
+    // A helper to safely convert BufferSource to a byte array
+    function bufferSourceToByteArray(source) {
+        if (source instanceof ArrayBuffer) {
+            return Array.from(new Uint8Array(source));
+        }
+        if (ArrayBuffer.isView(source)) {
+            return Array.from(new Uint8Array(source.buffer, source.byteOffset, source.byteLength));
+        }
+        // Fallback for other cases, though less common
+        return Array.from(new Uint8Array(source));
+    }
+
+
     // --- WebUSB Interception ---
     if (!navigator.usb) navigator.usb = {};
     const fakeUsbDevice = {
-        // ... (all the properties from your fakeDevice object)
         vendorId: 0x04b8,
         productId: 0x0202,
         productName: 'Virtual ESC/POS Printer',
@@ -21,9 +33,8 @@
 
         transferOut: async function(endpointNumber, data) {
             console.log(`[Interceptor] FAKE USB.transferOut called with ${data.byteLength} bytes.`);
-            const payloadArray = Array.from(new Uint8Array(data.buffer));
+            const payloadArray = bufferSourceToByteArray(data);
 
-            // Use window.postMessage to send data to the content script
             window.postMessage({
                 type: 'POS_SIMULATOR_RAW_DATA',
                 source: 'webusb',
@@ -49,7 +60,7 @@
             this.opened = true;
             this.writable = new WritableStream({
                 write(chunk) {
-                    const payloadArray = Array.from(new Uint8Array(chunk));
+                    const payloadArray = bufferSourceToByteArray(chunk);
                     window.postMessage({
                         type: 'POS_SIMULATOR_RAW_DATA',
                         source: 'webserial',
@@ -67,41 +78,60 @@
         return Promise.resolve(fakeSerialPort);
     };
 
-    // --- WebBluetooth Interception ---
+    // --- WebBluetooth Interception (Corrected) ---
     if (!navigator.bluetooth) navigator.bluetooth = {};
+
+    // 1. Define the device first, without the gatt server
     const fakeBluetoothDevice = {
         id: 'FAKE_BT_DEVICE_ID',
         name: 'Virtual Bluetooth Printer',
-        gatt: {
-            connected: false,
-            connect: async function() {
-                this.connected = true;
-                return Promise.resolve(this);
-            },
-            getPrimaryService: async () => {
-                return Promise.resolve({
-                    getCharacteristic: async () => {
-                        return Promise.resolve({
-                            writeValue: async (value) => {
-                                const payloadArray = Array.from(new Uint8Array(value));
-                                window.postMessage({
-                                    type: 'POS_SIMULATOR_RAW_DATA',
-                                    source: 'webbluetooth',
-                                    payload: payloadArray
-                                }, '*');
-                                return Promise.resolve();
-                            }
-                        });
-                    }
-                });
-            },
-            disconnect: function() { this.connected = false; }
-        }
+        gatt: null, // We'll attach this next
     };
+
+    // 2. Create the GATT server with a back-reference to the device
+    const gattServer = {
+        device: fakeBluetoothDevice, // This is the required back-reference
+        connected: false,
+        connect: async function() {
+            console.log('[Interceptor] FAKE BT GATT.connect');
+            this.connected = true;
+            return Promise.resolve(this); // 'this' is the gattServer object
+        },
+        disconnect: function() {
+            console.log('[Interceptor] FAKE BT GATT.disconnect');
+            this.connected = false;
+        },
+        getPrimaryService: async () => {
+            console.log('[Interceptor] FAKE BT GATT.getPrimaryService');
+            return Promise.resolve({
+                getCharacteristic: async () => {
+                    console.log('[Interceptor] FAKE BT Service.getCharacteristic');
+                    return Promise.resolve({
+                        writeValue: async (value) => {
+                            console.log(`[Interceptor] FAKE BT Char.writeValue with ${value.byteLength} bytes`);
+                            const payloadArray = bufferSourceToByteArray(value);
+                            window.postMessage({
+                                type: 'POS_SIMULATOR_RAW_DATA',
+                                source: 'webbluetooth',
+                                payload: payloadArray
+                            }, '*');
+                            return Promise.resolve();
+                        }
+                    });
+                }
+            });
+        },
+    };
+
+    // 3. Attach the fully-formed GATT server to the device
+    fakeBluetoothDevice.gatt = gattServer;
+
+    // 4. Intercept the requestDevice call
     navigator.bluetooth.requestDevice = () => {
         console.log('[Interceptor] Intercepted navigator.bluetooth.requestDevice');
         return Promise.resolve(fakeBluetoothDevice);
     };
+
 
     console.log('[interceptor.js] All APIs intercepted.');
 })();

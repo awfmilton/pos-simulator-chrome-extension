@@ -16,6 +16,7 @@ class PeripheralSimulatorService {
         this.usbDevices = new Map();
         this.posUrl = null;
         this.sidePanelPort = null;
+        this.queuedPrintData = null; // To hold data that arrives before the panel is ready
 
         this.init();
     }
@@ -33,6 +34,14 @@ class PeripheralSimulatorService {
             if (port.name === 'sidepanel') {
                 this.sidePanelPort = port;
                 console.log('[SW] Side panel connected.');
+
+                // If there's data that arrived before the panel was open, send it now.
+                if (this.queuedPrintData) {
+                    console.log('[SW] Sending queued print data to newly connected panel.');
+                    this.sidePanelPort.postMessage({ type: 'PRINT_DATA_RECEIVED', payload: this.queuedPrintData });
+                    this.queuedPrintData = null; // Clear the queue
+                }
+
                 port.onDisconnect.addListener(() => {
                     this.sidePanelPort = null;
                     console.log('[SW] Side panel disconnected.');
@@ -63,13 +72,13 @@ class PeripheralSimulatorService {
             const action = request.action || request.type;
 
             switch (action) {
-                // ADD THIS NEW CASE
                 case 'RAW_DATA_FROM_PAGE':
                     console.log(`[SW] Received ${request.source} data from content script.`);
                     if (this.sidePanelPort) {
                         this.sidePanelPort.postMessage({ type: 'PRINT_DATA_RECEIVED', payload: request.payload });
                     } else {
-                        console.error('[SW] Side panel not connected. Cannot forward print data.');
+                        console.warn('[SW] Side panel not connected. Queuing print data.');
+                        this.queuedPrintData = request.payload; // Store data until panel connects
                     }
                     break;
 
