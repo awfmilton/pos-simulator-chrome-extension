@@ -181,6 +181,44 @@
         return Promise.resolve(fakeBluetoothDevice);
     };
 
+    // --- Network (Fetch) Interception ---
+    const originalFetch = window.fetch;
+    window.fetch = async function(resource, config) {
+        const url = resource instanceof Request ? resource.url : resource;
+
+        // Check if it's the specific proxy URL we want to intercept
+        if (url.includes('/api/proxy_printer.php')) {
+            console.log(`[Interceptor] Intercepted fetch call to: ${url}`);
+
+            // The body might be a string, blob, or buffer. The POS sends XML as a string.
+            const body = await (config.body ? new Response(config.body).text() : Promise.resolve(''));
+
+            // Post the data to the content script for the simulator UI
+            window.postMessage({
+                type: 'POS_SIMULATOR_RAW_DATA',
+                source: 'network',
+                deviceType: 'network-printer',
+                payload: body // Send the raw XML/text data
+            }, '*');
+
+            // Simulate a successful response from the printer proxy
+            const successResponse = new Response(
+                '<?xml version="1.0" encoding="UTF-8"?><response success="true"></response>', {
+                    status: 200,
+                    statusText: 'OK',
+                    headers: {
+                        'Content-Type': 'text/xml'
+                    }
+                }
+            );
+
+            return Promise.resolve(successResponse);
+        }
+
+        // For all other requests, use the original fetch
+        return originalFetch.apply(this, arguments);
+    };
+
 
     console.log('[interceptor.js] All APIs intercepted.');
 })();
