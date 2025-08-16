@@ -19,28 +19,41 @@
 
     // --- WebUSB Interception ---
     if (!navigator.usb) navigator.usb = {};
-    const devices = {
-        printer: {
-            vendorId: 0x04b8, // Epson
-            productId: 0x0202,
-            productName: 'Virtual ESC/POS Printer',
+
+    // Helper function to create a virtual printer device
+    function createPrinterDevice(brand, vendorId, productId) {
+        return {
+            brand: brand,
+            vendorId: vendorId,
+            productId: productId,
+            productName: `Virtual ${brand} Printer`,
             opened: false,
-            open: async () => { console.log('[Interceptor] FAKE PRINTER.open'); return Promise.resolve(); },
-            close: async () => { console.log('[Interceptor] FAKE PRINTER.close'); return Promise.resolve(); },
-            selectConfiguration: async () => { console.log('[Interceptor] FAKE PRINTER.selectConfiguration'); return Promise.resolve(); },
-            claimInterface: async () => { console.log('[Interceptor] FAKE PRINTER.claimInterface'); return Promise.resolve(); },
+            open: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.open`); return Promise.resolve(); },
+            close: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.close`); return Promise.resolve(); },
+            selectConfiguration: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.selectConfiguration`); return Promise.resolve(); },
+            claimInterface: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.claimInterface`); return Promise.resolve(); },
             transferOut: async function(endpointNumber, data) {
-                console.log(`[Interceptor] FAKE PRINTER.transferOut with ${data.byteLength} bytes.`);
+                console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.transferOut with ${data.byteLength} bytes.`);
                 const payloadArray = bufferSourceToByteArray(data);
                 window.postMessage({
                     type: 'POS_SIMULATOR_RAW_DATA',
                     source: 'webusb',
                     deviceType: 'printer',
+                    brand: this.brand, // Pass the brand
                     payload: payloadArray
                 }, '*');
                 return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
             },
-        },
+        };
+    }
+
+    const devices = {
+        // Printer devices
+        epson: createPrinterDevice('epson', 0x04b8, 0x0202),
+        star: createPrinterDevice('star', 0x0519, 0x0003), // Common product ID for Star
+        citizen: createPrinterDevice('citizen', 0x1d90, 0x2037), // Common product ID for Citizen
+
+        // Other devices
         lineDisplay: {
             vendorId: 0x1504, // Logic Controls (Bematech)
             productId: 0x0006,
@@ -64,29 +77,37 @@
         }
     };
 
+    // Store printers in a separate map for easy lookup
+    const printerDevices = new Map([
+        [devices.epson.vendorId, devices.epson],
+        [devices.star.vendorId, devices.star],
+        [devices.citizen.vendorId, devices.citizen]
+    ]);
+
     navigator.usb.requestDevice = async (options) => {
         console.log('[Interceptor] Intercepted navigator.usb.requestDevice with options:', options);
 
         if (!options || !options.filters || options.filters.length === 0) {
-            console.warn('[Interceptor] requestDevice called with no filters. Returning default printer.');
-            // This behavior is for backward compatibility or general requests.
-            return Promise.resolve(devices.printer);
+            console.warn('[Interceptor] requestDevice called with no filters. Returning default Epson printer.');
+            return Promise.resolve(devices.epson); // Default to Epson
         }
 
         for (const filter of options.filters) {
+            // Check for printers
+            if (printerDevices.has(filter.vendorId)) {
+                const printer = printerDevices.get(filter.vendorId);
+                console.log(`[Interceptor] Matched ${printer.brand.toUpperCase()} printer. Returning virtual device.`);
+                return Promise.resolve(printer);
+            }
+
+            // Check for other devices like Line Display
             if (filter.vendorId === devices.lineDisplay.vendorId) {
                 console.log('[Interceptor] Line Display requested. Returning virtual line display.');
                 return Promise.resolve(devices.lineDisplay);
             }
-            if (filter.vendorId === devices.printer.vendorId) {
-                console.log('[Interceptor] Printer requested. Returning virtual printer.');
-                return Promise.resolve(devices.printer);
-            }
         }
 
         console.error('[Interceptor] No matching device found for filters:', options.filters);
-        // To avoid breaking the POS app, we can either return a default or reject.
-        // Rejecting is closer to the real API behavior if no device is found/chosen.
         return Promise.reject(new Error("No device selected."));
     };
 
