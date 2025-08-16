@@ -55,7 +55,8 @@ class POSContentScript {
                             type: 'RAW_DATA_FROM_PAGE',
                             source: event.data.source,
                             payload: event.data.payload,
-                            deviceType: event.data.deviceType
+                            deviceType: event.data.deviceType,
+                            brand: event.data.brand // Forward the brand
                         });
                     } catch (error) {
                         console.error('[CS] Error posting message to service worker port:', error);

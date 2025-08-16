@@ -131,7 +131,7 @@ class PeripheralSimulatorService {
 
 
     handleRawData(request) {
-        console.log(`[SW] Received raw data from ${request.source}`, request);
+        console.log(`[SW] Received raw data from ${request.source} for brand ${request.brand || 'N/A'}`, request);
         let printerType; // This is the connection type: usb, bluetooth, etc.
         switch (request.source) {
             case 'webusb':
@@ -157,9 +157,9 @@ class PeripheralSimulatorService {
                 this.sidePanelPort.postMessage({
                     type: 'PRINT_DATA_RECEIVED',
                     payload: request.payload,
-                    // Pass both source (for UI flashing) and deviceType (for parsing logic)
                     source: request.source,
-                    deviceType: request.deviceType
+                    deviceType: request.deviceType,
+                    brand: request.brand || this.printerStates[printerType].brand // Pass intercepted brand, or fall back to selected brand
                 });
             } else {
                 console.warn(`[SW] Side panel not connected. Cannot forward print data from ${printerType}.`);
