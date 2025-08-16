@@ -7,6 +7,7 @@ class PeripheralSimulatorService {
             network: { on: false, brand: 'epson' }
         };
         this.sidePanelPort = null;
+        this.contentScriptPorts = new Map();
         this.posUrlPattern = null;
         this.isConnected = false;
 
@@ -15,24 +16,25 @@ class PeripheralSimulatorService {
 
     init() {
         console.log('[SW] Initializing Service Worker...');
+        // Listen for any new connections
         chrome.runtime.onConnect.addListener(port => {
             if (port.name === 'sidepanel') {
-                console.log('[SW] Side panel connected.');
-                this.sidePanelPort = port;
-                port.onMessage.addListener(msg => this.handlePanelMessage(msg));
-                port.onDisconnect.addListener(() => {
-                    console.log('[SW] Side panel disconnected.');
-                    this.sidePanelPort = null;
-                });
-                this.updatePanelWithInitialState();
+                this.handleSidePanelConnection(port);
+            } else if (port.name === 'content-script') {
+                this.handleContentScriptConnection(port);
             }
         });
 
+        // This listener is for one-off messages, like from the panel settings
+        // or for injecting input into a tab.
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            if (request.type === 'RAW_DATA_FROM_PAGE') {
-                this.handleRawData(request);
-            } else if (request.action === 'INJECT_INPUT') {
+            if (request.action === 'INJECT_INPUT') {
                 this.injectInputToActivePage(request.data);
+                sendResponse({ success: true });
+            }
+            // The PING request is also a one-off message
+            else if (request.type === 'PING') {
+                sendResponse({ type: 'PONG' });
             }
             return true;
         });
@@ -44,12 +46,39 @@ class PeripheralSimulatorService {
         });
     }
 
+    handleSidePanelConnection(port) {
+        console.log('[SW] Side panel connected.');
+        this.sidePanelPort = port;
+        port.onMessage.addListener(msg => this.handlePanelMessage(msg));
+        port.onDisconnect.addListener(() => {
+            console.log('[SW] Side panel disconnected.');
+            this.sidePanelPort = null;
+        });
+        this.updatePanelWithInitialState();
+    }
+
+    handleContentScriptConnection(port) {
+        const tabId = port.sender.tab.id;
+        console.log(`[SW] Content script from tab ${tabId} connected.`);
+        this.contentScriptPorts.set(tabId, port);
+
+        port.onMessage.addListener((msg) => {
+            if (msg.type === 'RAW_DATA_FROM_PAGE') {
+                this.handleRawData(msg);
+            }
+        });
+
+        port.onDisconnect.addListener(() => {
+            console.log(`[SW] Content script from tab ${tabId} disconnected.`);
+            this.contentScriptPorts.delete(tabId);
+        });
+    }
+
+
     handlePanelMessage(msg) {
         console.log('[SW] Received message from side panel:', msg);
         switch (msg.type) {
             case 'KEEP_ALIVE':
-                // This message is just to keep the service worker active.
-                // No action needed, but we can log it for debugging.
                 console.log('[SW] Keep-alive signal received.');
                 break;
             case 'TOGGLE_PRINTER':
@@ -62,8 +91,6 @@ class PeripheralSimulatorService {
                 if (msg.data && msg.data.printerType) {
                     this.printerStates[msg.data.printerType].brand = msg.data.brand;
                     console.log(`[SW] Printer brand for ${msg.data.printerType} set to ${msg.data.brand}`);
-                    // Optionally, send confirmation back to panel, though not strictly necessary
-                    // as the panel initiated the change.
                 }
                 break;
             case 'CHECK_CONNECTION':
@@ -94,7 +121,14 @@ class PeripheralSimulatorService {
     async injectInputToActivePage(data) {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab) {
+            if (tab && this.contentScriptPorts.has(tab.id)) {
+                 // Send message through the persistent port for the active tab
+                 this.contentScriptPorts.get(tab.id).postMessage({
+                     action: 'INJECT_INPUT',
+                     data: data
+                 });
+            } else if (tab) {
+                // Fallback to one-off message if port not found (should be rare)
                 await chrome.tabs.sendMessage(tab.id, {
                     action: 'INJECT_INPUT',
                     data: data
@@ -167,14 +201,9 @@ class PeripheralSimulatorService {
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab && tab.url.match(new RegExp(this.posUrlPattern.replace('*', '.*')))) {
-                // Ping the content script to make sure it's alive
-                const response = await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
-                if (response && response.type === 'PONG') {
-                    this.updateConnectionStatus(true, tab.url);
-                } else {
-                    this.updateConnectionStatus(false, null);
-                }
+            // Check if the tab URL matches AND if we have an active connection from its content script
+            if (tab && tab.url.match(new RegExp(this.posUrlPattern.replace('*', '.*'))) && this.contentScriptPorts.has(tab.id)) {
+                this.updateConnectionStatus(true, tab.url);
             } else {
                 this.updateConnectionStatus(false, null);
             }
@@ -184,12 +213,15 @@ class PeripheralSimulatorService {
     }
 
     updateConnectionStatus(connected, url) {
-        if (this.isConnected !== connected && this.sidePanelPort) {
+        // Only send an update if the status has changed
+        if (this.isConnected !== connected) {
             this.isConnected = connected;
-            this.sidePanelPort.postMessage({
-                type: 'CONNECTION_STATUS',
-                data: { connected, url }
-            });
+            if (this.sidePanelPort) {
+                this.sidePanelPort.postMessage({
+                    type: 'CONNECTION_STATUS',
+                    data: { connected, url }
+                });
+            }
         }
     }
 }

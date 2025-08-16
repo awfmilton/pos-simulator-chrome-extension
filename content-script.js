@@ -14,24 +14,56 @@ function injectScript(filePath) {
 
 injectScript(chrome.runtime.getURL('interceptor.js'));
 
-// 2. Listen for messages from the injected script (main world)
+// 2. Establish a long-lived connection with the service worker
+let port;
+
+function connectToServiceWorker() {
+    port = chrome.runtime.connect({ name: 'content-script' });
+    console.log('[CS] Attempting to connect to service worker...');
+
+    port.onDisconnect.addListener(() => {
+        console.error('[CS] Disconnected from service worker. Attempting to reconnect in 5 seconds...');
+        port = null;
+        setTimeout(connectToServiceWorker, 5000); // Retry connection after a delay
+    });
+
+    // The POSContentScript class will handle incoming messages on this port
+    // This is set up below.
+}
+
+// Initial connection attempt
+connectToServiceWorker();
+
+
+// 3. Listen for messages from the injected script (main world) and forward them
 window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data.type) {
         return;
     }
 
     if (event.data.type === 'POS_SIMULATOR_RAW_DATA') {
-        chrome.runtime.sendMessage({
-            type: 'RAW_DATA_FROM_PAGE',
-            source: event.data.source,
-            payload: event.data.payload,
-            deviceType: event.data.deviceType
-        }).catch(error => {
-            console.error('[CS] Error sending message to service worker:', error);
-        });
+        if (port) {
+            try {
+                // Forward the message to the service worker via the persistent port
+                port.postMessage({
+                    type: 'RAW_DATA_FROM_PAGE',
+                    source: event.data.source,
+                    payload: event.data.payload,
+                    deviceType: event.data.deviceType
+                });
+            } catch (error) {
+                console.error('[CS] Error posting message to service worker port:', error);
+                // The port might have been disconnected just before the send.
+                // The onDisconnect handler will attempt to reconnect.
+            }
+        } else {
+            console.warn('[CS] Port not connected. Cannot send message:', event.data);
+        }
     }
 }, false);
 
+
+// 4. The class for handling commands FROM the service worker remains largely the same
 class POSContentScript {
     constructor() {
         this.lastFocusedElement = null;
@@ -44,6 +76,7 @@ class POSContentScript {
     }
 
     setupMessageListener() {
+        // Listen for messages from the service worker (via the port or one-off messages)
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (request.type === 'PING') {
                 sendResponse({ type: 'PONG' });
@@ -53,6 +86,15 @@ class POSContentScript {
             }
             return true;
         });
+
+        // Also listen for messages coming through the long-lived port
+        if (port) {
+            port.onMessage.addListener((request) => {
+                 if (request.action === 'INJECT_INPUT') {
+                    this.injectInput(request.data);
+                }
+            });
+        }
     }
 
     trackFocusedElements() {
