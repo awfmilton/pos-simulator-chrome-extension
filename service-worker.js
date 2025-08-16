@@ -1,10 +1,10 @@
 class PeripheralSimulatorService {
     constructor() {
         this.printerStates = {
-            usb: { on: false },
-            bluetooth: { on: false },
-            serial: { on: false },
-            network: { on: false }
+            usb: { on: false, brand: 'epson' },
+            bluetooth: { on: false, brand: 'epson' },
+            serial: { on: false, brand: 'epson' },
+            network: { on: false, brand: 'epson' }
         };
         this.sidePanelPort = null;
         this.posUrlPattern = null;
@@ -14,11 +14,16 @@ class PeripheralSimulatorService {
     }
 
     init() {
+        console.log('[SW] Initializing Service Worker...');
         chrome.runtime.onConnect.addListener(port => {
             if (port.name === 'sidepanel') {
+                console.log('[SW] Side panel connected.');
                 this.sidePanelPort = port;
                 port.onMessage.addListener(msg => this.handlePanelMessage(msg));
-                port.onDisconnect.addListener(() => this.sidePanelPort = null);
+                port.onDisconnect.addListener(() => {
+                    console.log('[SW] Side panel disconnected.');
+                    this.sidePanelPort = null;
+                });
                 this.updatePanelWithInitialState();
             }
         });
@@ -40,20 +45,40 @@ class PeripheralSimulatorService {
     }
 
     handlePanelMessage(msg) {
+        console.log('[SW] Received message from side panel:', msg);
         switch (msg.type) {
+            case 'KEEP_ALIVE':
+                // This message is just to keep the service worker active.
+                // No action needed, but we can log it for debugging.
+                console.log('[SW] Keep-alive signal received.');
+                break;
             case 'TOGGLE_PRINTER':
-                this.printerStates[msg.data.printerType].on = msg.data.isEnabled;
-                this.updatePanelWithPrinterState(msg.data.printerType);
+                if (msg.data && msg.data.printerType) {
+                    this.printerStates[msg.data.printerType].on = msg.data.isEnabled;
+                    this.updatePanelWithPrinterState(msg.data.printerType);
+                }
+                break;
+            case 'CHANGE_PRINTER_BRAND':
+                if (msg.data && msg.data.printerType) {
+                    this.printerStates[msg.data.printerType].brand = msg.data.brand;
+                    console.log(`[SW] Printer brand for ${msg.data.printerType} set to ${msg.data.brand}`);
+                    // Optionally, send confirmation back to panel, though not strictly necessary
+                    // as the panel initiated the change.
+                }
                 break;
             case 'CHECK_CONNECTION':
                 this.checkConnection();
                 break;
             case 'SETTINGS_UPDATED':
-                this.posUrlPattern = msg.data.targetUrl;
-                this.checkConnection();
+                if (msg.data) {
+                    this.posUrlPattern = msg.data.targetUrl;
+                    this.checkConnection();
+                }
                 break;
              case 'SCAN_BARCODE':
-                this.handleBarcodeScan(msg.data);
+                if (msg.data) {
+                    this.handleBarcodeScan(msg.data);
+                }
                 break;
         }
     }
@@ -82,6 +107,7 @@ class PeripheralSimulatorService {
 
 
     handleRawData(request) {
+        console.log(`[SW] Received raw data from ${request.source}`, request);
         let printerType;
         switch (request.source) {
             case 'webusb':
@@ -97,15 +123,23 @@ class PeripheralSimulatorService {
                 printerType = 'network';
                 break;
             default:
+                console.warn(`[SW] Unknown raw data source: ${request.source}`);
                 return;
         }
 
-        if (this.printerStates[printerType].on && this.sidePanelPort) {
-            this.sidePanelPort.postMessage({
-                type: 'PRINT_DATA_RECEIVED',
-                payload: request.payload,
-                deviceType: request.source
-            });
+        if (this.printerStates[printerType] && this.printerStates[printerType].on) {
+            if (this.sidePanelPort) {
+                console.log(`[SW] Forwarding print data from ${printerType} to side panel.`);
+                this.sidePanelPort.postMessage({
+                    type: 'PRINT_DATA_RECEIVED',
+                    payload: request.payload,
+                    deviceType: request.source
+                });
+            } else {
+                console.warn(`[SW] Side panel not connected. Cannot forward print data from ${printerType}.`);
+            }
+        } else {
+            console.log(`[SW] Printer ${printerType} is turned off. Ignoring raw data.`);
         }
     }
 

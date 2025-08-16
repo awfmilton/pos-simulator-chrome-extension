@@ -5,6 +5,7 @@ class POSSimulatorPanel {
     constructor() {
         this.currentTab = 'scanner';
         this.peripheralStates = {};
+        this.keepAliveInterval = null;
         this.escposParser = new EscPosParser();
         this.testData = {
             barcodes: {
@@ -42,57 +43,119 @@ class POSSimulatorPanel {
     }
 
     setupEventListeners() {
+        console.log('[PANEL] Setting up event listeners...');
         // Tab navigation
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchTab(e.currentTarget.dataset.tab));
+            btn.addEventListener('click', (e) => {
+                const tabName = e.currentTarget.dataset.tab;
+                console.log(`[USER-ACTION] Clicked tab: ${tabName}`);
+                this.switchTab(tabName);
+            });
         });
 
-        // Printer toggles
-        document.getElementById('usb-printer-toggle').addEventListener('change', (e) => this.togglePrinter('usb', e.target.checked));
-        document.getElementById('bluetooth-printer-toggle').addEventListener('change', (e) => this.togglePrinter('bluetooth', e.target.checked));
-        document.getElementById('serial-printer-toggle').addEventListener('change', (e) => this.togglePrinter('serial', e.target.checked));
-        document.getElementById('network-printer-toggle').addEventListener('change', (e) => this.togglePrinter('network', e.target.checked));
+        // Printer toggles and brand selection
+        ['usb', 'bluetooth', 'serial', 'network'].forEach(type => {
+            document.getElementById(`${type}-printer-toggle`).addEventListener('change', (e) => this.togglePrinter(type, e.target.checked));
+            document.getElementById(`${type}-printer-brand`).addEventListener('change', (e) => this.changePrinterBrand(type, e.target.value));
+        });
 
         // Barcode scanner events
-        document.getElementById('scan-btn').addEventListener('click', () => this.handleBarcodeScans());
-        document.getElementById('generate-barcode-btn').addEventListener('click', () => this.generateTestBarcode());
+        document.getElementById('scan-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Scan Barcode"');
+            this.handleBarcodeScans();
+        });
+        document.getElementById('generate-barcode-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Generate Test Barcode"');
+            this.generateTestBarcode();
+        });
         document.getElementById('barcode-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handleBarcodeScans();
+            if (e.key === 'Enter') {
+                console.log('[USER-ACTION] Pressed Enter in barcode input');
+                this.handleBarcodeScans();
+            }
         });
 
         // MSR events
-        document.getElementById('swipe-btn').addEventListener('click', () => this.handleMSRSwipe());
-        document.getElementById('generate-card-btn').addEventListener('click', () => this.generateTestCard());
+        document.getElementById('swipe-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Swipe Card"');
+            this.handleMSRSwipe();
+        });
+        document.getElementById('generate-card-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Generate Test Card"');
+            this.generateTestCard();
+        });
 
         // Printer events
-        document.getElementById('test-print-btn').addEventListener('click', () => this.handleTestPrint());
-        document.getElementById('clear-receipt-btn').addEventListener('click', () => this.clearReceipt());
+        document.getElementById('test-print-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Test Print"');
+            this.handleTestPrint();
+        });
+        document.getElementById('clear-receipt-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Clear Receipt"');
+            this.clearReceipt();
+        });
 
         // Cash drawer events
-        document.getElementById('open-drawer-btn').addEventListener('click', () => this.handleDrawerOpen());
-        document.getElementById('close-drawer-btn').addEventListener('click', () => this.handleDrawerClose());
+        document.getElementById('open-drawer-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Open Drawer"');
+            this.handleDrawerOpen();
+        });
+        document.getElementById('close-drawer-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Close Drawer"');
+            this.handleDrawerClose();
+        });
 
         // Scale events
         document.getElementById('weight-input').addEventListener('input', (e) => this.updateWeight(e.target.value));
         document.getElementById('weight-slider-input').addEventListener('input', (e) => this.updateWeight(e.target.value));
-        document.getElementById('weight-unit-select').addEventListener('change', (e) => this.updateWeightUnit(e.target.value));
-        document.getElementById('tare-btn').addEventListener('click', () => this.tareScale());
-        document.getElementById('zero-btn').addEventListener('click', () => this.zeroScale());
+        document.getElementById('weight-unit-select').addEventListener('change', (e) => {
+            console.log(`[USER-ACTION] Changed weight unit to: ${e.target.value}`);
+            this.updateWeightUnit(e.target.value);
+        });
+        document.getElementById('tare-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Tare"');
+            this.tareScale();
+        });
+        document.getElementById('zero-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Zero"');
+            this.zeroScale();
+        });
 
         // Line display events
-        document.getElementById('update-display-btn').addEventListener('click', () => this.updateLineDisplay());
-        document.getElementById('clear-display-btn').addEventListener('click', () => this.clearLineDisplay());
+        document.getElementById('update-display-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Update Display"');
+            this.updateLineDisplay();
+        });
+        document.getElementById('clear-display-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Clear Display"');
+            this.clearLineDisplay();
+        });
         document.getElementById('line1-input').addEventListener('input', (e) => this.updateDisplayPreview());
         document.getElementById('line2-input').addEventListener('input', (e) => this.updateDisplayPreview());
 
         // Global controls
-        document.getElementById('reset-all-btn').addEventListener('click', () => this.resetAll());
-        document.getElementById('settings-btn').addEventListener('click', () => this.showSettings());
+        document.getElementById('reset-all-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Reset All"');
+            this.resetAll();
+        });
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Settings"');
+            this.showSettings();
+        });
 
         // Settings modal
-        document.getElementById('close-settings-btn').addEventListener('click', () => this.hideSettings());
-        document.getElementById('save-settings-btn').addEventListener('click', () => this.saveSettings());
-        document.getElementById('cancel-settings-btn').addEventListener('click', () => this.hideSettings());
+        document.getElementById('close-settings-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Close Settings"');
+            this.hideSettings();
+        });
+        document.getElementById('save-settings-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Save Settings"');
+            this.saveSettings();
+        });
+        document.getElementById('cancel-settings-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Cancel Settings"');
+            this.hideSettings();
+        });
     }
 
 
@@ -102,18 +165,30 @@ class POSSimulatorPanel {
     }
 
     connectToServiceWorker() {
+        console.log('[PANEL] Connecting to service worker...');
         this.port = chrome.runtime.connect({ name: 'sidepanel' });
+
         this.port.onMessage.addListener((msg) => this.handlePortMessage(msg));
         this.port.onDisconnect.addListener(() => {
+            console.warn('[PANEL] Disconnected from service worker.');
             this.port = null;
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval);
+            }
             this.updateConnectionStatus(false, null);
         });
 
-        // Check connection status every 2 seconds
-        setInterval(() => this.sendMessage('CHECK_CONNECTION'), 2000);
+        // Start a heartbeat to keep the service worker alive
+        this.keepAliveInterval = setInterval(() => {
+            this.sendMessage('KEEP_ALIVE');
+        }, 20000); // 20 seconds
+
+        // Check connection status every 5 seconds
+        setInterval(() => this.sendMessage('CHECK_CONNECTION'), 5000);
     }
 
     handlePortMessage(msg) {
+        console.log('[PANEL] Received message from service worker:', msg);
         switch (msg.type) {
             case 'PRINTER_STATE_UPDATE':
                 this.updatePrinterStateUI(msg.printerType, msg.state);
@@ -172,17 +247,25 @@ class POSSimulatorPanel {
     }
 
     togglePrinter(printerType, isEnabled) {
+        console.log(`[USER-ACTION] Toggled ${printerType} printer ${isEnabled ? 'ON' : 'OFF'}`);
         this.sendMessage('TOGGLE_PRINTER', { printerType, isEnabled });
     }
 
     updatePrinterStateUI(printerType, state) {
         const toggle = document.getElementById(`${printerType}-printer-toggle`);
         const statusLight = document.getElementById(`${printerType}-printer-status`);
+        const brandSelect = document.getElementById(`${printerType}-printer-brand`);
 
         if (toggle) toggle.checked = state.on;
         if (statusLight) {
             statusLight.classList.toggle('connected', state.on);
         }
+        if (brandSelect) brandSelect.value = state.brand || 'epson';
+    }
+
+    changePrinterBrand(printerType, brand) {
+        console.log(`[USER-ACTION] Changed ${printerType} printer brand to ${brand}`);
+        this.sendMessage('CHANGE_PRINTER_BRAND', { printerType, brand });
     }
 
 
@@ -194,9 +277,10 @@ class POSSimulatorPanel {
 
     async sendMessage(type, data) {
         if (this.port) {
+            console.log(`[PANEL] Sending message to service worker: ${type}`, data);
             this.port.postMessage({ type, data });
         } else {
-            console.error("Port not connected");
+            console.error(`[PANEL] FAILED to send message. Port not connected. Type: ${type}`, data);
         }
     }
 
@@ -204,9 +288,19 @@ class POSSimulatorPanel {
         const indicator = document.getElementById('connection-indicator');
         const text = document.getElementById('connection-status-text');
 
+        const wasConnected = indicator.classList.contains('connected');
+
+        if (wasConnected !== connected) {
+            console.log(`[PANEL] Connection status changed. Connected: ${connected}. URL: ${url}`);
+        }
+
         indicator.classList.toggle('connected', connected);
         indicator.classList.toggle('disconnected', !connected);
-        text.textContent = connected ? `Connected to ${new URL(url).hostname}` : 'Disconnected';
+        try {
+            text.textContent = connected ? `Connected to ${new URL(url).hostname}` : 'Disconnected';
+        } catch(e) {
+            text.textContent = 'Disconnected';
+        }
     }
 
     // Existing methods (handleBarcodeScans, generateTestBarcode, etc.) go here...

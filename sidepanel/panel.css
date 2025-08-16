@@ -709,6 +709,15 @@ button {
     font-weight: 500;
 }
 
+.printer-brand-select {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border);
+    background-color: var(--background);
+    max-width: 150px;
+}
+
 
 /* Toggle Switch */
 .switch {
