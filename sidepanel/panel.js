@@ -197,8 +197,9 @@ class POSSimulatorPanel {
                 this.updateConnectionStatus(msg.data.connected, msg.data.url);
                 break;
             case 'PRINT_DATA_RECEIVED':
+                // Use msg.deviceType for parsing logic, and msg.source for UI flashing
                 this.handlePrintData(msg.payload, msg.deviceType);
-                this.flashPrinterIndicator(msg.deviceType);
+                this.flashPrinterIndicator(msg.source);
                 break;
         }
     }

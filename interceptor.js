@@ -151,6 +151,13 @@
             console.log('[Interceptor] FAKE BT GATT.getPrimaryService');
             // Define the characteristic once to be reused.
             const fakeCharacteristic = {
+                properties: {
+                    write: true,
+                    writeWithoutResponse: true,
+                    read: false,
+                    notify: false,
+                    indicate: false
+                },
                 writeValue: async (value) => {
                     console.log(`[Interceptor] FAKE BT Char.writeValue with ${value.byteLength} bytes`);
                     const payloadArray = bufferSourceToByteArray(value);

@@ -25,18 +25,13 @@ class PeripheralSimulatorService {
             }
         });
 
-        // This listener is for one-off messages, like from the panel settings
-        // or for injecting input into a tab.
+        // This listener is for one-off messages, like for injecting input into a tab.
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (request.action === 'INJECT_INPUT') {
                 this.injectInputToActivePage(request.data);
                 sendResponse({ success: true });
+                return true;
             }
-            // The PING request is also a one-off message
-            else if (request.type === 'PING') {
-                sendResponse({ type: 'PONG' });
-            }
-            return true;
         });
 
         chrome.storage.local.get('posSimulatorSettings', (result) => {
@@ -142,7 +137,7 @@ class PeripheralSimulatorService {
 
     handleRawData(request) {
         console.log(`[SW] Received raw data from ${request.source}`, request);
-        let printerType;
+        let printerType; // This is the connection type: usb, bluetooth, etc.
         switch (request.source) {
             case 'webusb':
                 printerType = 'usb';
@@ -167,7 +162,9 @@ class PeripheralSimulatorService {
                 this.sidePanelPort.postMessage({
                     type: 'PRINT_DATA_RECEIVED',
                     payload: request.payload,
-                    deviceType: request.source
+                    // Pass both source (for UI flashing) and deviceType (for parsing logic)
+                    source: request.source,
+                    deviceType: request.deviceType
                 });
             } else {
                 console.warn(`[SW] Side panel not connected. Cannot forward print data from ${printerType}.`);
