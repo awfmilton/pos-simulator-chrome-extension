@@ -701,21 +701,24 @@ button {
 .printer-control-group {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px; /* Reduced gap */
 }
 
 .printer-label {
     flex-grow: 1;
     font-weight: 500;
+    flex-basis: 60px; /* Give it a base width */
+    flex-shrink: 0;
 }
 
 .printer-brand-select {
-    padding: 4px 8px;
+    padding: 4px 6px; /* Reduced padding */
     font-size: 12px;
     border-radius: var(--border-radius);
     border: 1px solid var(--border);
     background-color: var(--background);
-    max-width: 120px;
+    max-width: 100px; /* Further reduced width */
+    flex-grow: 2; /* Allow it to take up more space if available */
 }
 
 
