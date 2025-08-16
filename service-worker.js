@@ -25,14 +25,9 @@ class PeripheralSimulatorService {
             }
         });
 
-        // This listener is for one-off messages, like for injecting input into a tab.
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            if (request.action === 'INJECT_INPUT') {
-                this.injectInputToActivePage(request.data);
-                sendResponse({ success: true });
-                return true;
-            }
-        });
+        // The onMessage listener is no longer needed for communication with the content
+        // script, as that is now handled by the long-lived port.
+        // We can remove it completely.
 
         chrome.storage.local.get('posSimulatorSettings', (result) => {
             if (result.posSimulatorSettings) {

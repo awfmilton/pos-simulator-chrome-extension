@@ -231,19 +231,34 @@ class POSSimulatorPanel {
     }
 
     handlePrintData(data, deviceType) {
-        if (deviceType === 'network-printer' && typeof data === 'string') {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(data, "text/xml");
-            const textNodes = xmlDoc.getElementsByTagName('text');
-            let receiptText = '';
-            for (let i = 0; i < textNodes.length; i++) {
-                receiptText += textNodes[i].textContent;
+        console.log(`[DEBUG] handlePrintData called. deviceType: ${deviceType}, typeof data: ${typeof data}`);
+        try {
+            if (deviceType === 'network-printer' && typeof data === 'string') {
+                console.log('[DEBUG] Handling as network printer XML.');
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(data, "text/xml");
+                const textNodes = xmlDoc.getElementsByTagName('text');
+                let receiptText = '';
+                for (let i = 0; i < textNodes.length; i++) {
+                    receiptText += textNodes[i].textContent;
+                }
+                console.log('[DEBUG] Parsed receipt text from XML:', receiptText);
+                this.displayReceipt(receiptText);
+            } else if (data) {
+                console.log('[DEBUG] Handling as binary data.');
+                const uint8Data = new Uint8Array(data);
+                console.log(`[DEBUG] Converted data to Uint8Array with length: ${uint8Data.length}`);
+                const parsedData = this.escposParser.parse(uint8Data);
+                console.log('[DEBUG] Parsed binary data:', parsedData);
+                const receiptHtml = this.escposParser.renderToHTML(parsedData);
+                console.log('[DEBUG] Rendered HTML from binary:', receiptHtml);
+                document.querySelector('.receipt-content').innerHTML = receiptHtml;
+            } else {
+                 console.warn('[DEBUG] handlePrintData received empty or invalid data.');
             }
-            this.displayReceipt(receiptText);
-        } else {
-            const parsedData = this.escposParser.parse(new Uint8Array(data));
-            const receiptHtml = this.escposParser.renderToHTML(parsedData);
-            document.querySelector('.receipt-content').innerHTML = receiptHtml;
+        } catch (error) {
+            console.error('[DEBUG] Error in handlePrintData:', error);
+            this.displayReceipt(`--- ERROR ---\nFailed to render receipt:\n${error.message}`);
         }
     }
 
