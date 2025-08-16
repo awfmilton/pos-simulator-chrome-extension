@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Virtual POS Peripheral Simulator",
-  "version": "1.0.0",
-  "description": "Comprehensive virtual peripheral simulator for Point of Sale system testing",
+  "name": "tbay.tk Virtual Peripheral Simulator",
+  "version": "2.1",
+  "description": "Comprehensive virtual peripheral simulator for Point of Sale system testing. Owned and Distributed by: tbay.tk LLC, MT, 59601. Developed by: Alexander Milton",
+  "author": "Alexander Milton",
   "permissions": [
     "activeTab",
     "storage",
