@@ -149,30 +149,41 @@
         },
         getPrimaryService: async () => {
             console.log('[Interceptor] FAKE BT GATT.getPrimaryService');
+            // Define the characteristic once to be reused.
+            const fakeCharacteristic = {
+                writeValue: async (value) => {
+                    console.log(`[Interceptor] FAKE BT Char.writeValue with ${value.byteLength} bytes`);
+                    const payloadArray = bufferSourceToByteArray(value);
+                    window.postMessage({
+                        type: 'POS_SIMULATOR_RAW_DATA',
+                        source: 'webbluetooth',
+                        deviceType: 'bluetooth-printer',
+                        payload: payloadArray
+                    }, '*');
+                    return Promise.resolve();
+                },
+                // The `...WithResponse` and `...WithoutResponse` methods are often just aliases
+                // in simulators, pointing to the core `writeValue` logic.
+                writeValueWithResponse: async function(value) {
+                    console.log(`[Interceptor] FAKE BT Char.writeValueWithResponse with ${value.byteLength} bytes`);
+                    return this.writeValue(value);
+                },
+                writeValueWithoutResponse: async function(value) {
+                    console.log(`[Interceptor] FAKE BT Char.writeValueWithoutResponse with ${value.byteLength} bytes`);
+                    return this.writeValue(value);
+                }
+            };
+
+            // Return a service object that has both singular and plural methods
             return Promise.resolve({
                 getCharacteristic: async () => {
-                    console.log('[Interceptor] FAKE BT Service.getCharacteristic');
-                    return Promise.resolve({
-                        writeValue: async (value) => {
-                            console.log(`[Interceptor] FAKE BT Char.writeValue with ${value.byteLength} bytes`);
-                            const payloadArray = bufferSourceToByteArray(value);
-                            window.postMessage({
-                                type: 'POS_SIMULATOR_RAW_DATA',
-                                source: 'webbluetooth',
-                                deviceType: 'bluetooth-printer',
-                                payload: payloadArray
-                            }, '*');
-                            return Promise.resolve();
-                        },
-                        writeValueWithResponse: async function(value) {
-                            console.log(`[Interceptor] FAKE BT Char.writeValueWithResponse with ${value.byteLength} bytes`);
-                            return this.writeValue(value);
-                        },
-                        writeValueWithoutResponse: async function(value) {
-                            console.log(`[Interceptor] FAKE BT Char.writeValueWithoutResponse with ${value.byteLength} bytes`);
-                            return this.writeValue(value);
-                        }
-                    });
+                    console.log('[Interceptor] FAKE BT Service.getCharacteristic (singular)');
+                    return Promise.resolve(fakeCharacteristic);
+                },
+                getCharacteristics: async () => {
+                    console.log('[Interceptor] FAKE BT Service.getCharacteristics (plural)');
+                    // The spec returns an array of characteristics.
+                    return Promise.resolve([fakeCharacteristic]);
                 }
             });
         },
