@@ -244,22 +244,37 @@ class POSSimulatorPanel {
 
             this.logActivity('printer', `Print job received (${brand}, ${data.length} bytes)`);
 
-            if (deviceType === 'network-printer' && typeof data === 'string') {
-                console.log('[PRINT] Handling as network printer XML string.');
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data, "text/xml");
-                const textNodes = xmlDoc.getElementsByTagName('text');
-                let receiptText = '';
-                for (let i = 0; i < textNodes.length; i++) {
-                    receiptText += textNodes[i].textContent;
-                }
-                console.log('[PRINT] Parsed receipt text from XML:', receiptText);
-                this.displayReceipt(receiptText);
-            } else {
-                console.log('[PRINT] Handling as binary ESC/POS data.');
-                const uint8Data = new Uint8Array(data);
-                console.log('[PRINT] Converted data to Uint8Array for parsing.');
+            let uint8Data;
 
+            // Special handling for network data, which could be XML string or raw ESC/POS string
+            if (deviceType === 'network-printer' && typeof data === 'string') {
+                // Check if it's likely XML (for Epson ePOS)
+                if (data.trim().startsWith('<')) {
+                    console.log('[PRINT] Handling as network printer XML string.');
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(data, "text/xml");
+                    const textNodes = xmlDoc.getElementsByTagName('text');
+                    let receiptText = '';
+                    for (let i = 0; i < textNodes.length; i++) {
+                        receiptText += textNodes[i].textContent;
+                    }
+                    console.log('[PRINT] Parsed receipt text from XML:', receiptText);
+                    this.displayReceipt(receiptText);
+                    return; // Exit after handling XML
+                } else {
+                    // It's likely raw ESC/POS data sent as a string. Convert it to a byte array.
+                    console.log('[PRINT] Handling as raw ESC/POS string from network. Converting to bytes.');
+                    uint8Data = new Uint8Array(data.split('').map(char => char.charCodeAt(0)));
+                }
+            } else {
+                // For all other sources (USB, etc.), the data should already be a byte array.
+                console.log('[PRINT] Handling as binary ESC/POS data.');
+                uint8Data = new Uint8Array(data);
+            }
+
+            // If we have data to parse with EscPosParser, do it here
+            if (uint8Data) {
+                console.log('[PRINT] Converted data to Uint8Array for parsing.');
                 const parsedData = this.escposParser.parse(uint8Data, brand);
                 console.log('[PRINT] Successfully parsed binary data:', parsedData);
 
@@ -267,6 +282,7 @@ class POSSimulatorPanel {
                 console.log('[PRINT] Successfully rendered HTML from parsed data.');
                 receiptContentEl.innerHTML = receiptHtml;
             }
+
         } catch (error) {
             console.error('[PRINT] Critical error in handlePrintData:', error);
             this.logActivity('printer', `ERROR: ${error.message}`);
@@ -435,55 +451,38 @@ class POSSimulatorPanel {
 
     // Printer Methods
     async handleTestPrint() {
-        this.updateStatus('Generating raw ESC/POS test print...');
-        this.logActivity('printer', 'Generating raw test print...');
-
-        // Get the currently selected brand from the USB printer dropdown
-        const brand = document.getElementById('usb-printer-brand').value;
-
-        const data = this.generateRawTestReceipt(brand);
-
-        // Directly call the handler to simulate a print job from the POS
-        // We use 'webusb' as the source and 'printer' as the deviceType for this test
-        this.handlePrintData(data, 'printer', brand);
-        this.flashPrinterIndicator('usb');
-        this.updateStatus(`Test print for ${brand} generated.`);
+        this.updateStatus('Printing test receipt...');
+        const testReceipt = this.generateTestReceipt();
+        try {
+            // This just displays the text, it doesn't simulate a raw print job
+            this.displayReceipt(testReceipt);
+            this.logActivity('printer', 'Test receipt generated');
+            this.updateStatus('Test receipt generated');
+        } catch (error) {
+            this.showError('Failed to generate test receipt: ' + error.message);
+        }
     }
 
-    generateRawTestReceipt(brand) {
-        const textEncoder = new TextEncoder();
-        const header = textEncoder.encode('VIRTUAL POS SIMULATOR\n');
-        const separator = textEncoder.encode('========================\n\n');
-        const body = textEncoder.encode('This is a raw ESC/POS test.\n\n');
-        const barcodeText = textEncoder.encode('1234567890');
-
-        // GS k (Barcode) - CODE128, null-terminated data
-        const barcodeCommand = new Uint8Array([0x1D, 0x6B, 73, ...barcodeText, 0x00]);
-
-        const footer = textEncoder.encode('\n\nThank you!\n');
-
-        // GS V (Cut) - Type varies by brand in our parser
-        // Epson/Star: 0 = Full Cut, 1 = Partial
-        // Citizen: 1 = Partial, 0 = Full
-        let cutType;
-        switch (brand) {
-            case 'star': cutType = 0; break; // Full cut
-            case 'citizen': cutType = 1; break; // Partial cut
-            case 'epson':
-            default: cutType = 65; break; // Full cut (using alternate code)
-        }
-        const cutCommand = new Uint8Array([0x1D, 0x56, cutType]);
-
-        // Combine all parts into a single Uint8Array
-        const combined = new Uint8Array(header.length + separator.length + body.length + barcodeCommand.length + footer.length + cutCommand.length);
-        combined.set(header, 0);
-        combined.set(separator, header.length);
-        combined.set(body, header.length + separator.length);
-        combined.set(barcodeCommand, header.length + separator.length + body.length);
-        combined.set(footer, header.length + separator.length + body.length + barcodeCommand.length);
-        combined.set(cutCommand, header.length + separator.length + body.length + barcodeCommand.length + footer.length);
-
-        return combined;
+    generateTestReceipt() {
+        const timestamp = new Date().toLocaleString();
+        return [
+            'VIRTUAL POS SIMULATOR',
+            '========================',
+            '',
+            'Test Receipt #12345',
+            `Date: ${timestamp}`,
+            '',
+            'Item 1.............$10.00',
+            'Item 2.............$15.50',
+            'Item 3..............$5.99',
+            '------------------------',
+            'Subtotal...........$31.49',
+            'Tax................$2.52',
+            'TOTAL..............$34.01',
+            '',
+            'Thank you for your business!',
+            ''
+        ].join('\n');
     }
 
     displayReceipt(receiptText) {
