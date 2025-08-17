@@ -216,39 +216,109 @@ function createUSBScaleDevice(scaleType, config) {
     };
 }
 
-    // Helper function to create a virtual printer device
-    function createPrinterDevice(brand, vendorId, productId) {
-        return {
-            brand: brand,
-            vendorId: vendorId,
-            productId: productId,
-            productName: `Virtual ${brand} Printer`,
-            opened: false,
-            open: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.open`); return Promise.resolve(); },
-            close: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.close`); return Promise.resolve(); },
-            selectConfiguration: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.selectConfiguration`); return Promise.resolve(); },
-            claimInterface: async () => { console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.claimInterface`); return Promise.resolve(); },
-            transferOut: async function(endpointNumber, data) {
-                console.log(`[Interceptor] FAKE ${brand.toUpperCase()}.transferOut with ${data.byteLength} bytes.`);
-                const payloadArray = bufferSourceToByteArray(data);
-                window.postMessage({
-                    type: 'POS_SIMULATOR_RAW_DATA',
-                    source: 'webusb',
-                    deviceType: 'printer',
-                    brand: this.brand, // Pass the brand
-                    payload: payloadArray
-                }, '*');
-                return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
-            },
-        };
+// Enhanced USB printer devices with proper vendor/product IDs
+const printerUSBDevices = {
+    epson: {
+        // Epson TM series printers
+        tm_t88vi: { vendorId: 0x04b8, productId: 0x0202, name: 'EPSON TM-T88VI' },
+        tm_t20iii: { vendorId: 0x04b8, productId: 0x0219, name: 'EPSON TM-T20III' },
+        tm_m30ii: { vendorId: 0x04b8, productId: 0x0220, name: 'EPSON TM-M30II' }
+    },
+    star: {
+        // Star Micronics TSP series
+        tsp100: { vendorId: 0x0519, productId: 0x0003, name: 'Star TSP100' },
+        tsp650ii: { vendorId: 0x0519, productId: 0x0007, name: 'Star TSP650II' },
+        tsp143iii: { vendorId: 0x0519, productId: 0x0015, name: 'Star TSP143III' }
+    },
+    citizen: {
+        // Citizen CT-S series
+        ct_s310a: { vendorId: 0x1d90, productId: 0x2037, name: 'Citizen CT-S310A' },
+        ct_s4000: { vendorId: 0x1d90, productId: 0x2061, name: 'Citizen CT-S4000' }
     }
+};
+
+// Enhanced USB printer device creation
+function createUSBPrinterDevice(brand, model, config) {
+    return {
+        vendorId: config.vendorId,
+        productId: config.productId,
+        productName: config.name,
+        manufacturerName: brand.toUpperCase(),
+        serialNumber: `SIM${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+        opened: false,
+        configurations: [{
+            configurationValue: 1,
+            interfaces: [{
+                interfaceNumber: 0,
+                alternates: [{
+                    alternateSetting: 0,
+                    interfaceClass: 7, // Printer class
+                    interfaceSubclass: 1,
+                    interfaceProtocol: 2, // Bidirectional
+                    endpoints: [
+                        { endpointNumber: 1, direction: 'out', type: 'bulk' },
+                        { endpointNumber: 2, direction: 'in', type: 'bulk' }
+                    ]
+                }]
+            }]
+        }],
+
+        open: async function() {
+            console.log(`[USB] Opening ${brand} ${model} printer`);
+            this.opened = true;
+            return Promise.resolve();
+        },
+
+        close: async function() {
+            console.log(`[USB] Closing ${brand} ${model} printer`);
+            this.opened = false;
+            return Promise.resolve();
+        },
+
+        selectConfiguration: async function(configValue) {
+            console.log(`[USB] Selecting configuration ${configValue}`);
+            return Promise.resolve();
+        },
+
+        claimInterface: async function(interfaceNumber) {
+            console.log(`[USB] Claiming interface ${interfaceNumber}`);
+            return Promise.resolve();
+        },
+
+        transferOut: async function(endpointNumber, data) {
+            console.log(`[USB] ${brand} printer receiving ${data.byteLength} bytes on endpoint ${endpointNumber}`);
+
+            const payloadArray = bufferSourceToByteArray(data);
+            window.postMessage({
+                type: 'POS_SIMULATOR_RAW_DATA',
+                source: 'webusb',
+                deviceType: 'printer',
+                brand: brand,
+                model: model,
+                payload: payloadArray,
+                connectionType: 'usb'
+            }, '*');
+
+            return Promise.resolve({
+                status: 'ok',
+                bytesWritten: data.byteLength
+            });
+        },
+
+        transferIn: async function(endpointNumber, length) {
+            console.log(`[USB] ${brand} printer status request on endpoint ${endpointNumber}`);
+            // Return printer status (online, no errors)
+            const statusData = new Uint8Array([0x12, 0x00, 0x00, 0x00]); // Online status
+            return Promise.resolve({
+                status: 'ok',
+                data: new DataView(statusData.buffer)
+            });
+        }
+    };
+}
 
     const devices = {
         // Existing devices...
-        epson: createPrinterDevice('epson', 0x04b8, 0x0202),
-        star: createPrinterDevice('star', 0x0519, 0x0003),
-        citizen: createPrinterDevice('citizen', 0x1d90, 0x2037),
-
         // Scale devices
         mettlerScale: createUSBScaleDevice('mettlerToledo', scaleDevices.mettlerToledo),
         detectoScale: createUSBScaleDevice('detecto', scaleDevices.detecto),
@@ -282,13 +352,6 @@ function createUSBScaleDevice(scaleType, config) {
         }
     };
 
-    // Store printers in a separate map for easy lookup
-    const printerDevices = new Map([
-        [devices.epson.vendorId, devices.epson],
-        [devices.star.vendorId, devices.star],
-        [devices.citizen.vendorId, devices.citizen]
-    ]);
-
     // Update USB device mapping
     const scaleUSBDevices = new Map([
         [0x0eb8, devices.mettlerScale], // Mettler Toledo
@@ -302,46 +365,71 @@ function createUSBScaleDevice(scaleType, config) {
         [0x0403, devices.serialDrawer] // FTDI Serial Drawer
     ]);
 
-    // Update navigator.usb.requestDevice to handle drawers
+    // Enhanced WebUSB device enumeration
     navigator.usb.requestDevice = async (options) => {
-        console.log('[Interceptor] Intercepted navigator.usb.requestDevice with options:', options);
+        console.log('[USB] Printer device requested with filters:', options);
 
-        if (!options || !options.filters || options.filters.length === 0) {
-            console.warn('[Interceptor] requestDevice called with no filters. Returning default scale.');
-            return Promise.resolve(devices.mettlerScale);
+        if (options && options.filters) {
+            for (const filter of options.filters) {
+                // Check for printers
+                for (const [brand, models] of Object.entries(printerUSBDevices)) {
+                    for (const [model, config] of Object.entries(models)) {
+                        if (filter.vendorId === config.vendorId &&
+                            (!filter.productId || filter.productId === config.productId)) {
+                            console.log(`[USB] Returning ${brand} ${model} printer`);
+                            return Promise.resolve(createUSBPrinterDevice(brand, model, config));
+                        }
+                    }
+                }
+
+                // Check for cash drawers
+                if (drawerUSBDevices.has(filter.vendorId)) {
+                    const drawer = drawerUSBDevices.get(filter.vendorId);
+                    console.log(`[Interceptor] Cash Drawer detected. Returning virtual drawer device.`);
+                    return Promise.resolve(drawer);
+                }
+
+                // Check for scales
+                if (scaleUSBDevices.has(filter.vendorId)) {
+                    const scale = scaleUSBDevices.get(filter.vendorId);
+                    console.log(`[Interceptor] Scale detected. Returning virtual scale device.`);
+                    return Promise.resolve(scale);
+                }
+
+                // Line display detection
+                if (filter.vendorId === devices.lineDisplay.vendorId) {
+                    console.log('[Interceptor] Line Display requested. Returning virtual line display.');
+                    return Promise.resolve(devices.lineDisplay);
+                }
+            }
         }
 
-        for (const filter of options.filters) {
-            // Check for cash drawers first
-            if (drawerUSBDevices.has(filter.vendorId)) {
-                const drawer = drawerUSBDevices.get(filter.vendorId);
-                console.log(`[Interceptor] Cash Drawer detected. Returning virtual drawer device.`);
-                return Promise.resolve(drawer);
-            }
+        if (!options?.filters?.length) {
+            // Return default printer if no filters
+            console.log('[USB] No filters provided, returning default Epson printer.');
+            return Promise.resolve(createUSBPrinterDevice('epson', 'tm_t88vi', printerUSBDevices.epson.tm_t88vi));
+        }
 
-            // Check for scales
-            if (scaleUSBDevices.has(filter.vendorId)) {
-                const scale = scaleUSBDevices.get(filter.vendorId);
-                console.log(`[Interceptor] Scale detected. Returning virtual scale device.`);
-                return Promise.resolve(scale);
-            }
+        throw new Error('No matching device found for filters: ' + JSON.stringify(options.filters));
+    };
 
-            // Existing printer detection...
-            if (printerDevices.has(filter.vendorId)) {
-                const printer = printerDevices.get(filter.vendorId);
-                console.log(`[Interceptor] Matched ${printer.brand.toUpperCase()} printer. Returning virtual device.`);
-                return Promise.resolve(printer);
-            }
+    navigator.usb.getDevices = async () => {
+        console.log('[USB] Enumerating available printer devices');
+        const allDevices = [];
 
-            // Line display detection...
-            if (filter.vendorId === devices.lineDisplay.vendorId) {
-                console.log('[Interceptor] Line Display requested. Returning virtual line display.');
-                return Promise.resolve(devices.lineDisplay);
+        // Add all printer models
+        for (const [brand, models] of Object.entries(printerUSBDevices)) {
+            for (const [model, config] of Object.entries(models)) {
+                allDevices.push(createUSBPrinterDevice(brand, model, config));
             }
         }
 
-        console.error('[Interceptor] No matching device found for filters:', options.filters);
-        return Promise.reject(new Error("No device selected."));
+        // Add other USB devices
+        allDevices.push(...scaleUSBDevices.values());
+        allDevices.push(...drawerUSBDevices.values());
+        allDevices.push(devices.lineDisplay);
+
+        return Promise.resolve(allDevices);
     };
 
     // --- WebHID Interception ---
@@ -491,6 +579,93 @@ function createUSBScaleDevice(scaleType, config) {
     // --- WebSerial Interception ---
     if (!navigator.serial) navigator.serial = {};
 
+    // Serial printer port implementation
+function createSerialPrinterPort(brand, model, config) {
+    return {
+        getInfo: () => ({
+            usbVendorId: config.vendorId,
+            usbProductId: config.productId,
+            bluetoothServiceClassId: undefined
+        }),
+
+        opened: false,
+        readable: null,
+        writable: null,
+
+        open: async function(options = {}) {
+            console.log(`[Serial] Opening ${brand} ${model} on COM port`);
+            console.log('[Serial] Port options:', options);
+
+            this.opened = true;
+
+            // Create writable stream for ESC/POS commands
+            this.writable = new WritableStream({
+                write: (chunk) => {
+                    console.log(`[Serial] ${brand} printer receiving ${chunk.byteLength} bytes`);
+
+                    const payloadArray = bufferSourceToByteArray(chunk);
+                    window.postMessage({
+                        type: 'POS_SIMULATOR_RAW_DATA',
+                        source: 'webserial',
+                        deviceType: 'printer',
+                        brand: brand,
+                        model: model,
+                        payload: payloadArray,
+                        connectionType: 'serial'
+                    }, '*');
+                },
+
+                close: () => {
+                    console.log(`[Serial] ${brand} printer write stream closed`);
+                }
+            });
+
+            // Create readable stream for printer status
+            this.readable = new ReadableStream({
+                start: (controller) => {
+                    console.log(`[Serial] ${brand} printer readable stream started`);
+
+                    // Send initial ready status
+                    setTimeout(() => {
+                        const readyStatus = new Uint8Array([0x16]); // SYN - printer ready
+                        controller.enqueue(readyStatus);
+                    }, 100);
+
+                    // Periodic status updates
+                    this.statusInterval = setInterval(() => {
+                        if (this.opened) {
+                            const status = new Uint8Array([0x12, 0x00, 0x00, 0x00]); // Online, no errors
+                            try {
+                                controller.enqueue(status);
+                            } catch (e) {
+                                clearInterval(this.statusInterval);
+                            }
+                        }
+                    }, 5000);
+                }
+            });
+
+            return Promise.resolve();
+        },
+
+        close: async function() {
+            console.log(`[Serial] Closing ${brand} ${model}`);
+            this.opened = false;
+            if (this.statusInterval) {
+                clearInterval(this.statusInterval);
+            }
+            return Promise.resolve();
+        }
+    };
+}
+
+// Serial port enumeration
+const serialPrinterPorts = {
+    epson_tm_t88vi: createSerialPrinterPort('epson', 'TM-T88VI', { vendorId: 0x04b8, productId: 0x0202 }),
+    star_tsp100: createSerialPrinterPort('star', 'TSP100', { vendorId: 0x0519, productId: 0x0003 }),
+    citizen_cts310: createSerialPrinterPort('citizen', 'CT-S310', { vendorId: 0x1d90, productId: 0x2037 })
+};
+
     const fakeSerialScalePort = {
         getInfo: () => ({
             usbVendorId: 0x10C4,  // Common for serial scales
@@ -632,30 +807,43 @@ function createUSBScaleDevice(scaleType, config) {
         }
     };
 
-    navigator.serial.requestPort = (options) => {
-        console.log('[Interceptor] Intercepted navigator.serial.requestPort with options:', options);
-        if (options && options.filters) {
-            for (const filter of options.filters) {
-                // Check for scale
-                if (filter.usbVendorId === 0x10C4 && filter.usbProductId === 0xEA60) {
-                     console.log('[Interceptor] Serial Scale requested. Returning virtual scale port.');
-                     return Promise.resolve(fakeSerialScalePort);
-                }
-                // Check for line display
-                if (filter.usbVendorId === 0x1504 && filter.usbProductId === 0x0006) {
-                     console.log('[Interceptor] Serial Line Display requested. Returning virtual display port.');
-                     return Promise.resolve(enhancedFakeSerialPort);
+    // Enhanced WebSerial port enumeration
+    navigator.serial.requestPort = async (options) => {
+        console.log('[Serial] Printer port requested:', options);
+
+        if (!options?.filters?.length) {
+            return Promise.resolve(serialPrinterPorts.epson_tm_t88vi);
+        }
+
+        for (const filter of options.filters) {
+            for (const [key, port] of Object.entries(serialPrinterPorts)) {
+                const info = port.getInfo();
+                if (filter.usbVendorId === info.usbVendorId &&
+                    (!filter.usbProductId || filter.usbProductId === info.usbProductId)) {
+                    console.log(`[Serial] Returning ${key} printer port`);
+                    return Promise.resolve(port);
                 }
             }
+             // Check for scale
+            if (filter.usbVendorId === 0x10C4 && filter.usbProductId === 0xEA60) {
+                    console.log('[Interceptor] Serial Scale requested. Returning virtual scale port.');
+                    return Promise.resolve(fakeSerialScalePort);
+            }
+            // Check for line display
+            if (filter.usbVendorId === 0x1504 && filter.usbProductId === 0x0006) {
+                    console.log('[Interceptor] Serial Line Display requested. Returning virtual display port.');
+                    return Promise.resolve(enhancedFakeSerialPort);
+            }
         }
-        console.log('[Interceptor] No specific serial filter match, returning default Line Display port.');
-        return Promise.resolve(enhancedFakeSerialPort);
+
+        throw new Error('No matching serial printer found');
     };
 
-    // Auto-populate available devices
     navigator.serial.getPorts = async () => {
-        console.log('[Interceptor] Intercepted navigator.serial.getPorts');
-        return Promise.resolve([enhancedFakeSerialPort, fakeSerialScalePort]);
+        console.log('[Serial] Enumerating available printer ports');
+        const existingPorts = [enhancedFakeSerialPort, fakeSerialScalePort];
+        const printerPorts = Object.values(serialPrinterPorts);
+        return Promise.resolve([...existingPorts, ...printerPorts]);
     };
 
     // Simulate device connection events
@@ -667,93 +855,201 @@ function createUSBScaleDevice(scaleType, config) {
         }
     }, 2000);
 
-    // --- WebBluetooth Interception (Corrected) ---
-    if (!navigator.bluetooth) navigator.bluetooth = {};
+// Enhanced Bluetooth Printer Implementation
+// Enhanced Bluetooth printer with proper service UUIDs
+const bluetoothPrinterServices = {
+    // Standard Bluetooth printer service UUIDs
+    PRINT_SERVICE: '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+    WRITE_CHARACTERISTIC: '49535343-8841-43f4-a8d4-ecbe34729bb3',
+    NOTIFY_CHARACTERISTIC: '49535343-1e4d-4bd9-ba61-23c647249616'
+};
 
-    // 1. Define the device first, without the gatt server
-    const fakeBluetoothDevice = {
-        id: 'FAKE_BT_DEVICE_ID',
-        name: 'Virtual Bluetooth Printer',
-        gatt: null, // We'll attach this next
+function createBluetoothPrinterDevice(brand, model) {
+    const device = {
+        id: `bt_${brand}_${model}_${Math.random().toString(36).substr(2, 6)}`,
+        name: `${brand.toUpperCase()} ${model}`,
+        gatt: null
     };
 
-    // 2. Create the GATT server with a back-reference to the device
-    const gattServer = {
-        device: fakeBluetoothDevice, // This is the required back-reference
-        connected: false,
-        connect: async function() {
-            console.log('[Interceptor] FAKE BT GATT.connect');
-            this.connected = true;
-            return Promise.resolve(this); // 'this' is the gattServer object
+    const writeCharacteristic = {
+        uuid: bluetoothPrinterServices.WRITE_CHARACTERISTIC,
+        properties: {
+            write: true,
+            writeWithoutResponse: true,
+            read: false,
+            notify: false
         },
+
+        writeValue: async function(value) {
+            console.log(`[Bluetooth] ${brand} printer receiving ${value.byteLength} bytes`);
+
+            const payloadArray = bufferSourceToByteArray(value);
+            window.postMessage({
+                type: 'POS_SIMULATOR_RAW_DATA',
+                source: 'webbluetooth',
+                deviceType: 'printer',
+                brand: brand,
+                model: model,
+                payload: payloadArray,
+                connectionType: 'bluetooth'
+            }, '*');
+
+            return Promise.resolve();
+        },
+
+        writeValueWithResponse: async function(value) {
+            await this.writeValue(value);
+            return Promise.resolve();
+        },
+
+        writeValueWithoutResponse: async function(value) {
+            return this.writeValue(value);
+        }
+    };
+
+    const printService = {
+        uuid: bluetoothPrinterServices.PRINT_SERVICE,
+
+        getCharacteristic: async function(uuid) {
+            if (uuid === bluetoothPrinterServices.WRITE_CHARACTERISTIC) {
+                return Promise.resolve(writeCharacteristic);
+            }
+            throw new Error('Characteristic not found');
+        },
+
+        getCharacteristics: async function() {
+            return Promise.resolve([writeCharacteristic]);
+        }
+    };
+
+    device.gatt = {
+        device: device,
+        connected: false,
+
+        connect: async function() {
+            console.log(`[Bluetooth] Connecting to ${brand} ${model}`);
+            this.connected = true;
+            return Promise.resolve(this);
+        },
+
         disconnect: function() {
-            console.log('[Interceptor] FAKE BT GATT.disconnect');
+            console.log(`[Bluetooth] Disconnecting from ${brand} ${model}`);
             this.connected = false;
         },
-        getPrimaryService: async () => {
-            console.log('[Interceptor] FAKE BT GATT.getPrimaryService');
-            // Define the characteristic once to be reused.
-            const fakeCharacteristic = {
-                properties: {
-                    write: true,
-                    writeWithoutResponse: true,
-                    read: false,
-                    notify: false,
-                    indicate: false
-                },
-                writeValue: async (value) => {
-                    console.log(`[Interceptor] FAKE BT Char.writeValue with ${value.byteLength} bytes`);
-                    const payloadArray = bufferSourceToByteArray(value);
-                    window.postMessage({
-                        type: 'POS_SIMULATOR_RAW_DATA',
-                        source: 'webbluetooth',
-                        deviceType: 'bluetooth-printer',
-                        payload: payloadArray
-                    }, '*');
-                    return Promise.resolve();
-                },
-                // The `...WithResponse` and `...WithoutResponse` methods are often just aliases
-                // in simulators, pointing to the core `writeValue` logic.
-                writeValueWithResponse: async function(value) {
-                    console.log(`[Interceptor] FAKE BT Char.writeValueWithResponse with ${value.byteLength} bytes`);
-                    return this.writeValue(value);
-                },
-                writeValueWithoutResponse: async function(value) {
-                    console.log(`[Interceptor] FAKE BT Char.writeValueWithoutResponse with ${value.byteLength} bytes`);
-                    return this.writeValue(value);
-                }
-            };
 
-            // Return a service object that has both singular and plural methods
-            return Promise.resolve({
-                getCharacteristic: async () => {
-                    console.log('[Interceptor] FAKE BT Service.getCharacteristic (singular)');
-                    return Promise.resolve(fakeCharacteristic);
-                },
-                getCharacteristics: async () => {
-                    console.log('[Interceptor] FAKE BT Service.getCharacteristics (plural)');
-                    // The spec returns an array of characteristics.
-                    return Promise.resolve([fakeCharacteristic]);
-                }
-            });
-        },
+        getPrimaryService: async function(serviceUuid) {
+            if (serviceUuid === bluetoothPrinterServices.PRINT_SERVICE) {
+                return Promise.resolve(printService);
+            }
+            throw new Error('Service not found');
+        }
     };
 
-    // 3. Attach the fully-formed GATT server to the device
-    fakeBluetoothDevice.gatt = gattServer;
+    return device;
+}
 
-    // 4. Intercept the requestDevice call
-    navigator.bluetooth.requestDevice = (options) => {
-        console.log('[Interceptor] Intercepted navigator.bluetooth.requestDevice with options:', options);
-        // Bluetooth filtering can be complex. For now, we'll return the single
-        // fake printer device regardless of the filter.
-        return Promise.resolve(fakeBluetoothDevice);
-    };
+// Enhanced WebBluetooth device enumeration
+navigator.bluetooth.requestDevice = async (options) => {
+    console.log('[Bluetooth] Printer device requested:', options);
 
-    // --- Network (Fetch) Interception ---
-    const originalFetch = window.fetch;
-    window.fetch = async function(resource, config) {
-        const url = resource instanceof Request ? resource.url : resource;
+    // Check if requesting printer services
+    const printerServiceRequested = options?.filters?.some(filter =>
+        filter.services?.includes(bluetoothPrinterServices.PRINT_SERVICE)
+    ) || options?.optionalServices?.includes(bluetoothPrinterServices.PRINT_SERVICE);
+
+    if (printerServiceRequested || options?.acceptAllDevices) {
+        return Promise.resolve(createBluetoothPrinterDevice('epson', 'TM-T88VI'));
+    }
+
+    throw new Error('No matching Bluetooth printer found');
+};
+
+    // Enhanced network printer interception
+const networkPrinterEndpoints = [
+    '/api/printer',
+    '/api/print',
+    '/api/proxy_printer.php',
+    '/printer/print',
+    '/pos/printer',
+    '/escpos/print'
+];
+
+// Network printer protocols
+const networkProtocols = {
+    // Raw TCP socket printing (common for network printers)
+    RAW_TCP: 9100,
+    // HTTP-based printing
+    HTTP: 80,
+    HTTPS: 443,
+    // IPP (Internet Printing Protocol)
+    IPP: 631
+};
+
+// Enhanced fetch interception for network printers
+const originalFetch = window.fetch;
+window.fetch = async function(resource, config = {}) {
+    const url = resource instanceof Request ? resource.url : resource;
+
+    // Check if this is a printer-related network call
+    const isPrinterCall = networkPrinterEndpoints.some(endpoint => url.includes(endpoint));
+
+    if (isPrinterCall) {
+        console.log(`[Network] Intercepted printer call to: ${url}`);
+        console.log('[Network] Request config:', config);
+
+        let payload = '';
+        let contentType = 'application/octet-stream';
+
+        if (config.body) {
+            if (typeof config.body === 'string') {
+                payload = config.body;
+                contentType = config.headers?.['Content-Type'] || 'text/plain';
+            } else if (config.body instanceof ArrayBuffer) {
+                payload = Array.from(new Uint8Array(config.body));
+                contentType = 'application/octet-stream';
+            } else if (config.body instanceof Uint8Array) {
+                payload = Array.from(config.body);
+                contentType = 'application/octet-stream';
+            } else {
+                payload = await new Response(config.body).text();
+            }
+        }
+
+        // Determine printer brand from URL or headers
+        let brand = 'epson'; // default
+        if (url.includes('star') || config.headers?.['User-Agent']?.includes('Star')) {
+            brand = 'star';
+        } else if (url.includes('citizen') || config.headers?.['User-Agent']?.includes('Citizen')) {
+            brand = 'citizen';
+        }
+
+        window.postMessage({
+            type: 'POS_SIMULATOR_RAW_DATA',
+            source: 'network',
+            deviceType: 'printer',
+            brand: brand,
+            payload: payload,
+            contentType: contentType,
+            connectionType: 'network',
+            endpoint: url
+        }, '*');
+
+        // Return appropriate success response
+        const responseData = JSON.stringify({
+            status: 'success',
+            message: 'Print job accepted',
+            jobId: Math.random().toString(36).substr(2, 8)
+        });
+
+        return Promise.resolve(new Response(responseData, {
+            status: 200,
+            statusText: 'OK',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Printer-Status': 'online'
+            }
+        }));
+    }
 
         // Check for drawer commands via network
         if (url.includes('/api/drawer.php') || url.includes('drawer') || url.includes('cash')) {
@@ -774,38 +1070,9 @@ function createUSBScaleDevice(scaleType, config) {
             }));
         }
 
-        // Check if it's the specific proxy URL we want to intercept
-        if (url.includes('/api/proxy_printer.php')) {
-            console.log(`[Interceptor] Intercepted fetch call to: ${url}`);
-
-            // The body might be a string, blob, or buffer. The POS sends XML as a string.
-            const body = await (config.body ? new Response(config.body).text() : Promise.resolve(''));
-
-            // Post the data to the content script for the simulator UI
-            window.postMessage({
-                type: 'POS_SIMULATOR_RAW_DATA',
-                source: 'network',
-                deviceType: 'network-printer',
-                payload: body // Send the raw XML/text data
-            }, '*');
-
-            // Simulate a successful response from the printer proxy
-            const successResponse = new Response(
-                '<?xml version="1.0" encoding="UTF-8"?><response success="true"></response>', {
-                    status: 200,
-                    statusText: 'OK',
-                    headers: {
-                        'Content-Type': 'text/xml'
-                    }
-                }
-            );
-
-            return Promise.resolve(successResponse);
-        }
-
-        // For all other requests, use the original fetch
-        return originalFetch.apply(this, arguments);
-    };
+    // For non-printer calls, use original fetch
+    return originalFetch.apply(this, arguments);
+};
 
 
     console.log('[interceptor.js] All APIs intercepted.');
