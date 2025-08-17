@@ -72,6 +72,21 @@ class EscPosParser {
                         else if (alignValue === 1 || alignValue === 49) state.align = 'center';
                         else if (alignValue === 2 || alignValue === 50) state.align = 'right';
                         break;
+                    case 0x70: // ESC p (Drawer Kick)
+                        // Command: ESC p m t1 t2
+                        // m = pin, t1 = on-time, t2 = off-time
+                        const pin = data[i + 1];
+                        const onTime = data[i + 2];
+                        const offTime = data[i + 3];
+                        receipt.lines.push({
+                            type: 'command',
+                            name: 'drawer_kick',
+                            pin: pin,
+                            on_time: onTime,
+                            off_time: offTime
+                        });
+                        i += 3; // Consume the 3 parameters
+                        break;
                     default:
                          console.warn(`[Parser] Skipping unknown ESC command: 0x${commandCode.toString(16)}`);
                          // We assume a 1-byte parameter for unknown commands to avoid getting stuck
@@ -105,8 +120,10 @@ class EscPosParser {
 
         flushBuffer(); // Add any remaining text
 
-        console.log('[Parser] Stateful parsing complete. Receipt:', receipt);
-        return receipt;
+        // The new parser returns the full receipt object, which includes lines, brand, and commands
+        const commands = receipt.lines.filter(line => line.type === 'command');
+        console.log('[Parser] Stateful parsing complete. Receipt:', { ...receipt, commands });
+        return { ...receipt, commands };
     }
 
     decodeCutCommand(cutType, brand) {
@@ -147,11 +164,15 @@ class EscPosParser {
     renderToHTML(receipt) {
         console.log('[Renderer] Rendering receipt to HTML for brand:', receipt.brand);
         let html = '';
+        let drawerCommands = 0;
 
         receipt.lines.forEach(line => {
             if (line.type === 'command') {
-                if (line.name === 'cut') {
-                    html += `<div class="receipt-line command">--- [Cut] ---</div>`;
+                if (line.name === 'drawer_kick') {
+                    drawerCommands++;
+                    html += `<div class="receipt-line command">🔓 CASH DRAWER KICK COMMAND #${drawerCommands}</div>`;
+                } else if (line.name === 'cut') {
+                     html += `<div class="receipt-line command">✂️ ${line.value} (${line.brand})</div>`;
                 } else if (line.name === 'barcode') {
                      html += `<div class="receipt-line command">[BARCODE: ${line.value}]</div>`;
                      html += `<div class="barcode-placeholder">║█║▌║█║▌│║▌█║▌║</div>`;

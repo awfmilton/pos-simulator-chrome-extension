@@ -158,6 +158,20 @@ class PeripheralSimulatorService {
     handleRawData(request) {
         console.log(`[SW] Received raw data from ${request.source} for device ${request.deviceType}`, request);
 
+        // Handle cash drawer commands
+        if (request.deviceType === 'cash-drawer') {
+            if (this.sidePanelPort) {
+                console.log('[SW] Forwarding drawer command to side panel.');
+                this.sidePanelPort.postMessage({
+                    type: 'DRAWER_COMMAND_RECEIVED',
+                    source: request.source,
+                    command: request.command || 'open',
+                    drawerType: request.drawerType
+                });
+            }
+            return;
+        }
+
         // Handle scale data forwarding
         if (request.deviceType === 'scale') {
             if (this.sidePanelPort) {
@@ -165,10 +179,10 @@ class PeripheralSimulatorService {
                     type: 'SCALE_DATA_RECEIVED',
                     payload: request.payload,
                     source: request.source,
-                    scaleType: request.scaleType // e.g., 'mettlerToledo'
+                    scaleType: request.scaleType
                 });
             }
-            return; // Scale data does not need further processing here
+            return;
         }
 
         // Handle printer and other device data

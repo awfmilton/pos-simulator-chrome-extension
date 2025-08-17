@@ -248,6 +248,14 @@ class POSSimulatorPanel {
                 this.logActivity('scale', `Data from ${msg.source} (${msg.scaleType || 'N/A'}): ${msg.payload.length} bytes`);
                 this.flashScaleIndicator();
                 break;
+            case 'DRAWER_COMMAND_RECEIVED':
+                console.log('[PANEL] Direct drawer command received:', msg);
+                this.logActivity('drawer', `Direct drawer command from ${msg.source} (${msg.drawerType || 'unknown'})`);
+                this.triggerDrawerOpen(msg.source);
+
+                // Show notification
+                this.showDrawerNotification(1, `Direct ${msg.source}`);
+                break;
         }
     }
 
@@ -286,6 +294,7 @@ class POSSimulatorPanel {
     }
 
     handlePrintData(data, deviceType, brand = 'epson') {
+        // ... existing line display handling ...
         if (deviceType === 'line-display') {
             this.logActivity('display', `Line display data received (${data.length} bytes)`);
             const uint8Data = new Uint8Array(data);
@@ -330,55 +339,49 @@ class POSSimulatorPanel {
             }
 
             this.logActivity('printer', `Print job received (${brand}, ${data.length} bytes)`);
-
             let uint8Data;
 
-            // Special handling for network data, which could be XML string or raw ESC/POS string
+            // Handle different data formats...
             if (deviceType === 'network-printer' && typeof data === 'string') {
-                // Check if it's likely XML (for Epson ePOS)
                 if (data.trim().startsWith('<')) {
-                    console.log('[PRINT] Handling as network printer XML string.');
-                    const parser = new DOMParser();
-                    const xmlDoc = parser.parseFromString(data, "text/xml");
-                    const textNodes = xmlDoc.getElementsByTagName('text');
-                    let receiptText = '';
-                    for (let i = 0; i < textNodes.length; i++) {
-                        receiptText += textNodes[i].textContent;
-                    }
-                    console.log('[PRINT] Parsed receipt text from XML:', receiptText);
-                    this.displayReceipt(receiptText);
-                    return; // Exit after handling XML
+                     // This is ePOS XML, we won't get drawer kick commands from here typically.
+                     console.log('[PRINT] Handling as network printer XML string.');
+                     const parser = new DOMParser();
+                     const xmlDoc = parser.parseFromString(data, "text/xml");
+                     const textNodes = xmlDoc.getElementsByTagName('text');
+                     let receiptText = '';
+                     for (let i = 0; i < textNodes.length; i++) {
+                         receiptText += textNodes[i].textContent;
+                     }
+                     this.displayReceipt(receiptText); // just display text for now
+                     return;
                 } else {
-                    // It's likely raw ESC/POS data sent as a string. Convert it to a byte array.
-                    console.log('[PRINT] Handling as raw ESC/POS string from network. Converting to bytes.');
                     uint8Data = new Uint8Array(data.split('').map(char => char.charCodeAt(0)));
                 }
             } else {
-                // For all other sources (USB, etc.), the data should already be a byte array.
-                console.log('[PRINT] Handling as binary ESC/POS data.');
                 uint8Data = new Uint8Array(data);
             }
 
-            // If we have data to parse with EscPosParser, do it here
             if (uint8Data) {
                 console.log('[PRINT] Converted data to Uint8Array for parsing.');
                 const parsedData = this.escposParser.parse(uint8Data, brand);
                 console.log('[PRINT] Successfully parsed binary data:', parsedData);
 
+                // Check for drawer kick commands
+                const drawerCommands = parsedData.commands.filter(cmd => cmd.name === 'drawer_kick');
+                if (drawerCommands.length > 0) {
+                    console.log(`[PRINT] Found ${drawerCommands.length} drawer kick command(s)!`);
+                    this.handleDrawerKickFromPrinter(drawerCommands.length, brand);
+                }
+
                 const receiptHtml = this.escposParser.renderToHTML(parsedData);
                 console.log('[PRINT] Successfully rendered HTML from parsed data.');
                 receiptContentEl.innerHTML = receiptHtml;
             }
-
         } catch (error) {
             console.error('[PRINT] Critical error in handlePrintData:', error);
             this.logActivity('printer', `ERROR: ${error.message}`);
-            receiptContentEl.innerHTML = `
-                <div class="receipt-line error-header">--- PRINTING ERROR ---</div>
-                <div class="receipt-line error-message">Failed to process receipt data.</div>
-                <div class="receipt-line error-details">${error.message}</div>
-                <div class="receipt-line error-info">Check the console for more details.</div>
-            `;
+            receiptContentEl.innerHTML = `Error processing print data: ${error.message}`;
         }
     }
 
@@ -598,10 +601,8 @@ class POSSimulatorPanel {
         this.updateStatus('Opening cash drawer...');
 
         try {
-            await this.sendMessage('OPEN_DRAWER');
-            this.updateDrawerVisual(true);
-            this.logActivity('drawer', 'Drawer opened');
-            this.updateStatus('Cash drawer opened');
+            // The user wants to use triggerDrawerOpen for manual open.
+            this.triggerDrawerOpen('manual');
         } catch (error) {
             this.showError('Failed to open drawer: ' + error.message);
         }
@@ -613,6 +614,63 @@ class POSSimulatorPanel {
         this.updateStatus('Cash drawer closed');
     }
 
+    // New method to handle drawer open from any source
+    triggerDrawerOpen(source = 'manual') {
+        console.log(`[DRAWER] Opening drawer triggered by: ${source}`);
+        // We don't need to send a message here as this is the final action handler
+        this.updateDrawerVisual(true);
+        this.logActivity('drawer', `Drawer opened via ${source}`);
+    }
+
+    // Add new method to handle drawer commands from printer
+    handleDrawerKickFromPrinter(commandCount, brand) {
+        this.logActivity('printer', `🔓 Cash drawer kick command detected! (${commandCount} command${commandCount > 1 ? 's' : ''}) via ${brand} printer`);
+
+        // Add visual indicator to printer tab
+        const printerStatus = document.querySelector('.printer-tab .status-light');
+        if (printerStatus) {
+            printerStatus.style.backgroundColor = '#ff6b35'; // Orange for drawer command
+            setTimeout(() => {
+                printerStatus.style.backgroundColor = ''; // Reset
+            }, 2000);
+        }
+
+        // Open the drawer on the drawer tab
+        this.triggerDrawerOpen('printer');
+
+        // Show notification on printer tab
+        this.showDrawerNotification(commandCount, brand);
+    }
+
+    // Add notification method
+    showDrawerNotification(commandCount, brand) {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'drawer-notification';
+        notification.innerHTML = `
+        <div class="drawer-notification-content">
+            <span class="drawer-notification-icon">🔓</span>
+            <div class="drawer-notification-text">
+                <div class="drawer-notification-title">Cash Drawer Command Sent!</div>
+                <div class="drawer-notification-details">${commandCount} drawer kick${commandCount > 1 ? 's' : ''} via ${brand.toUpperCase()} printer</div>
+            </div>
+        </div>
+    `;
+
+        // Add to printer tab
+        const printerTab = document.getElementById('printer-panel');
+        if (printerTab) {
+            printerTab.insertBefore(notification, printerTab.querySelector('.receipt-display'));
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+    }
+
     updateDrawerVisual(isOpen) {
         const drawer = document.getElementById('drawer-visual');
         const statusText = document.getElementById('drawer-status-text');
@@ -622,28 +680,31 @@ class POSSimulatorPanel {
     }
 
     // Scale Methods
+    // Enhance existing updateWeight method to sync with interceptor
     updateWeight(value) {
         const weight = parseFloat(value) || 0;
+        const unit = document.getElementById('weight-unit-select').value;
+
         document.getElementById('weight-input').value = weight;
         document.getElementById('weight-slider-input').value = weight;
+        // The user's snippet refers to a 'weight-readout' class, which doesn't exist.
+        // I will update the existing 'weight-value' element instead.
         document.getElementById('weight-value').textContent = weight.toFixed(2);
 
         const stableIndicator = document.getElementById('stable-indicator');
         const zeroIndicator = document.getElementById('zero-indicator');
         stableIndicator.classList.toggle('active', true);
         zeroIndicator.classList.toggle('active', weight === 0);
-
-        const unit = document.getElementById('weight-unit-select').value;
         document.getElementById('weight-unit').textContent = unit;
 
+        // Sync with interceptor through service worker
         this.sendMessage('UPDATE_SCALE', {
             weight: weight,
             unit: unit,
             stable: true
         });
 
-        // This log message is from the user's request
-        this.logActivity('scale', `Weight updated: ${weight.toFixed(2)} ${unit}`);
+        this.logActivity('scale', `Weight updated: ${weight} ${unit}`);
     }
 
     updateWeightUnit(unit) {

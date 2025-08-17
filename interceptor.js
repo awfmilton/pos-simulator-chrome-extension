@@ -78,6 +78,71 @@ const scaleDevices = {
     }
 };
 
+// --- Cash Drawer Devices ---
+const drawerDevices = {
+    // USB Cash Drawer
+    usbDrawer: {
+        vendorId: 0x04d9, // APG Cash Drawer
+        productId: 0x1203,
+        productName: 'Virtual Cash Drawer',
+        opened: false
+    },
+
+    // Serial Cash Drawer
+    serialDrawer: {
+        vendorId: 0x0403, // FTDI
+        productId: 0x6001,
+        productName: 'Virtual Serial Cash Drawer',
+        opened: false
+    }
+};
+
+// Helper function to create virtual USB drawer device
+function createUSBDrawerDevice(drawerType, config) {
+    return {
+        vendorId: config.vendorId,
+        productId: config.productId,
+        productName: config.productName,
+        opened: false,
+
+        open: async () => {
+            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.open`);
+            return Promise.resolve();
+        },
+
+        close: async () => {
+            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.close`);
+            return Promise.resolve();
+        },
+
+        selectConfiguration: async () => {
+            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.selectConfiguration`);
+            return Promise.resolve();
+        },
+
+        claimInterface: async () => {
+            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.claimInterface`);
+            return Promise.resolve();
+        },
+
+        transferOut: async function(endpointNumber, data) {
+            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.transferOut - OPENING DRAWER!`);
+
+            // Send drawer open command
+            window.postMessage({
+                type: 'POS_SIMULATOR_RAW_DATA',
+                source: 'webusb',
+                deviceType: 'cash-drawer',
+                drawerType: drawerType,
+                payload: Array.from(data),
+                command: 'open'
+            }, '*');
+
+            return Promise.resolve({ status: 'ok', bytesWritten: data.byteLength });
+        }
+    };
+}
+
 // Helper function to create virtual USB scale device
 function createUSBScaleDevice(scaleType, config) {
     return {
@@ -179,17 +244,21 @@ function createUSBScaleDevice(scaleType, config) {
     }
 
     const devices = {
-        // Existing printer devices...
+        // Existing devices...
         epson: createPrinterDevice('epson', 0x04b8, 0x0202),
         star: createPrinterDevice('star', 0x0519, 0x0003),
         citizen: createPrinterDevice('citizen', 0x1d90, 0x2037),
 
-        // Add scale devices
+        // Scale devices
         mettlerScale: createUSBScaleDevice('mettlerToledo', scaleDevices.mettlerToledo),
         detectoScale: createUSBScaleDevice('detecto', scaleDevices.detecto),
         serialScale: createUSBScaleDevice('serialScale', scaleDevices.serialScale),
 
-        // Existing line display...
+        // Add drawer devices
+        usbDrawer: createUSBDrawerDevice('usbDrawer', drawerDevices.usbDrawer),
+        serialDrawer: createUSBDrawerDevice('serialDrawer', drawerDevices.serialDrawer),
+
+        // Line display
         lineDisplay: {
             vendorId: 0x1504, // Logic Controls (Bematech)
             productId: 0x0006,
@@ -227,7 +296,13 @@ function createUSBScaleDevice(scaleType, config) {
         [0x10C4, devices.serialScale]   // Generic serial scale
     ]);
 
-    // Update requestDevice to handle scales
+    // Update USB device mapping to include drawers
+    const drawerUSBDevices = new Map([
+        [0x04d9, devices.usbDrawer], // APG Cash Drawer
+        [0x0403, devices.serialDrawer] // FTDI Serial Drawer
+    ]);
+
+    // Update navigator.usb.requestDevice to handle drawers
     navigator.usb.requestDevice = async (options) => {
         console.log('[Interceptor] Intercepted navigator.usb.requestDevice with options:', options);
 
@@ -237,7 +312,14 @@ function createUSBScaleDevice(scaleType, config) {
         }
 
         for (const filter of options.filters) {
-            // Check for scales first
+            // Check for cash drawers first
+            if (drawerUSBDevices.has(filter.vendorId)) {
+                const drawer = drawerUSBDevices.get(filter.vendorId);
+                console.log(`[Interceptor] Cash Drawer detected. Returning virtual drawer device.`);
+                return Promise.resolve(drawer);
+            }
+
+            // Check for scales
             if (scaleUSBDevices.has(filter.vendorId)) {
                 const scale = scaleUSBDevices.get(filter.vendorId);
                 console.log(`[Interceptor] Scale detected. Returning virtual scale device.`);
@@ -672,6 +754,25 @@ function createUSBScaleDevice(scaleType, config) {
     const originalFetch = window.fetch;
     window.fetch = async function(resource, config) {
         const url = resource instanceof Request ? resource.url : resource;
+
+        // Check for drawer commands via network
+        if (url.includes('/api/drawer.php') || url.includes('drawer') || url.includes('cash')) {
+            console.log(`[Interceptor] Intercepted drawer network call to: ${url}`);
+
+            // Send drawer command
+            window.postMessage({
+                type: 'POS_SIMULATOR_RAW_DATA',
+                source: 'network',
+                deviceType: 'cash-drawer',
+                command: 'open',
+                payload: config.body ? Array.from(new TextEncoder().encode(config.body)) : []
+            }, '*');
+
+            return Promise.resolve(new Response('{"status":"ok","drawer":"opened"}', {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }));
+        }
 
         // Check if it's the specific proxy URL we want to intercept
         if (url.includes('/api/proxy_printer.php')) {
