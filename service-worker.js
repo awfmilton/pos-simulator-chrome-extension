@@ -141,6 +141,9 @@ class PeripheralSimulatorService {
         console.log(`[SW] Received raw data from ${request.source} for brand ${request.brand || 'N/A'}`, request);
         let printerType; // This is the connection type: usb, bluetooth, etc.
         switch (request.source) {
+            case 'webhid':
+                printerType = 'serial'; // Treat HID as serial for line displays
+                break;
             case 'webusb':
                 printerType = 'usb';
                 break;

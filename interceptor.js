@@ -118,39 +118,126 @@ License: personal use $5/month, business use $100/month
         return Promise.reject(new Error("No device selected."));
     };
 
+    // --- WebHID Interception ---
+    if (!navigator.hid) navigator.hid = {};
+
+    const fakeHIDDevice = {
+        vendorId: 0x1504, // Logic Controls (common for line displays)
+        productId: 0x0006,
+        productName: 'Virtual Line Display',
+        collections: [],
+        opened: false,
+
+        open: async function() {
+            console.log('[Interceptor] FAKE HID.open');
+            this.opened = true;
+            return Promise.resolve();
+        },
+
+        close: async function() {
+            console.log('[Interceptor] FAKE HID.close');
+            this.opened = false;
+            return Promise.resolve();
+        },
+
+        sendReport: async function(reportId, data) {
+            console.log(`[Interceptor] FAKE HID.sendReport with ${data.byteLength} bytes`);
+            const payloadArray = bufferSourceToByteArray(data);
+            window.postMessage({
+                type: 'POS_SIMULATOR_RAW_DATA',
+                source: 'webhid',
+                deviceType: 'line-display',
+                payload: payloadArray
+            }, '*');
+            return Promise.resolve();
+        }
+    };
+
+    navigator.hid.requestDevice = async (options) => {
+        console.log('[Interceptor] Intercepted navigator.hid.requestDevice with options:', options);
+        return Promise.resolve([fakeHIDDevice]);
+    };
+
+    navigator.hid.getDevices = async () => {
+        console.log('[Interceptor] Intercepted navigator.hid.getDevices');
+        return Promise.resolve([fakeHIDDevice]);
+    };
+
     // --- WebSerial Interception ---
     if (!navigator.serial) navigator.serial = {};
-    const fakeSerialPort = {
-        getInfo: () => ({ usbVendorId: 0x1234, usbProductId: 0x5678 }),
+
+    // Enhanced WebSerial with better device simulation
+    const enhancedFakeSerialPort = {
+        getInfo: () => ({
+            usbVendorId: 0x1504,  // Logic Controls
+            usbProductId: 0x0006,
+            bluetoothServiceClassId: undefined
+        }),
+
         opened: false,
         writable: null,
         readable: null,
+
         open: async function(options) {
+            console.log('[Interceptor] Enhanced serial port opening with options:', options);
             this.opened = true;
+
+            // Create enhanced writable stream that handles line display commands
             this.writable = new WritableStream({
                 write(chunk) {
                     const payloadArray = bufferSourceToByteArray(chunk);
+
+                    // Check if it's a line display command pattern
+                    const hex = Array.from(payloadArray).map(b => b.toString(16).padStart(2, '0')).join('');
+                    console.log('[Interceptor] Serial command:', hex);
+
                     window.postMessage({
                         type: 'POS_SIMULATOR_RAW_DATA',
                         source: 'webserial',
-                        // We can't easily distinguish serial devices without more info,
-                        // so we'll assume a generic 'serial' type for now.
-                        deviceType: 'serial',
+                        deviceType: 'line-display',
                         payload: payloadArray
                     }, '*');
                 }
             });
-            this.readable = new ReadableStream();
+
+            // Create readable stream for device responses
+            this.readable = new ReadableStream({
+                start(controller) {
+                    // Simulate device ready response
+                    setTimeout(() => {
+                        controller.enqueue(new Uint8Array([0x06])); // ACK
+                    }, 100);
+                }
+            });
+
             return Promise.resolve();
         },
-        close: async function() { this.opened = false; return Promise.resolve(); },
+
+        close: async function() {
+            this.opened = false;
+            return Promise.resolve();
+        }
     };
+
     navigator.serial.requestPort = (options) => {
         console.log('[Interceptor] Intercepted navigator.serial.requestPort with options:', options);
-        // The Web Serial API `requestPort` also has filters. We could expand this
-        // in the future if needed, but for now, we return the single fake port.
-        return Promise.resolve(fakeSerialPort);
+        return Promise.resolve(enhancedFakeSerialPort);
     };
+
+    // Auto-populate available devices
+    navigator.serial.getPorts = async () => {
+        console.log('[Interceptor] Intercepted navigator.serial.getPorts');
+        return Promise.resolve([enhancedFakeSerialPort]);
+    };
+
+    // Simulate device connection events
+    setTimeout(() => {
+        if (navigator.serial.addEventListener) {
+            const connectEvent = new Event('connect');
+            connectEvent.port = enhancedFakeSerialPort;
+            navigator.serial.dispatchEvent(connectEvent);
+        }
+    }, 2000);
 
     // --- WebBluetooth Interception (Corrected) ---
     if (!navigator.bluetooth) navigator.bluetooth = {};
