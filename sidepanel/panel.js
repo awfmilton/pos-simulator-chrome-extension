@@ -172,6 +172,10 @@ class POSSimulatorPanel {
         document.getElementById('line1-input').addEventListener('input', (e) => this.updateDisplayPreview());
         document.getElementById('line2-input').addEventListener('input', (e) => this.updateDisplayPreview());
 
+        // Display settings
+        document.getElementById('display-brightness').addEventListener('input', (e) => this.updateDisplayBrightness(e.target.value));
+        document.getElementById('display-blink').addEventListener('change', (e) => this.toggleDisplayBlink(e.target.checked));
+
         // Global controls
         document.getElementById('reset-all-btn').addEventListener('click', () => {
             console.log('[USER-ACTION] Clicked "Reset All"');
@@ -240,6 +244,18 @@ class POSSimulatorPanel {
                 this.handlePrintData(msg.payload, msg.deviceType, msg.brand);
                 this.flashPrinterIndicator(msg.source);
                 break;
+            case 'SCALE_DATA_RECEIVED':
+                this.logActivity('scale', `Data from ${msg.source} (${msg.scaleType || 'N/A'}): ${msg.payload.length} bytes`);
+                this.flashScaleIndicator();
+                break;
+        }
+    }
+
+    flashScaleIndicator() {
+        const indicator = document.getElementById('scale-status');
+        if (indicator) {
+            indicator.classList.add('transmitting');
+            setTimeout(() => indicator.classList.remove('transmitting'), 500);
         }
     }
 
@@ -606,34 +622,40 @@ class POSSimulatorPanel {
     }
 
     // Scale Methods
-    updateWeight(weight) {
-        const weightValue = parseFloat(weight) || 0;
-        document.getElementById('weight-value').textContent = weightValue.toFixed(2);
-        document.getElementById('weight-input').value = weightValue;
-        document.getElementById('weight-slider-input').value = weightValue;
+    updateWeight(value) {
+        const weight = parseFloat(value) || 0;
+        document.getElementById('weight-input').value = weight;
+        document.getElementById('weight-slider-input').value = weight;
+        document.getElementById('weight-value').textContent = weight.toFixed(2);
 
         const stableIndicator = document.getElementById('stable-indicator');
         const zeroIndicator = document.getElementById('zero-indicator');
-
         stableIndicator.classList.toggle('active', true);
-        zeroIndicator.classList.toggle('active', weightValue === 0);
+        zeroIndicator.classList.toggle('active', weight === 0);
+
+        const unit = document.getElementById('weight-unit-select').value;
+        document.getElementById('weight-unit').textContent = unit;
 
         this.sendMessage('UPDATE_SCALE', {
-            weight: weightValue,
-            unit: document.getElementById('weight-unit-select').value,
+            weight: weight,
+            unit: unit,
             stable: true
         });
+
+        // This log message is from the user's request
+        this.logActivity('scale', `Weight updated: ${weight.toFixed(2)} ${unit}`);
     }
 
     updateWeightUnit(unit) {
-        document.getElementById('weight-unit').textContent = unit;
-        this.sendMessage('UPDATE_SCALE', { unit: unit });
+        // When unit changes, we re-send the whole scale state
+        const currentWeight = document.getElementById('weight-input').value;
+        this.updateWeight(currentWeight);
     }
 
     tareScale() {
-        const currentWeight = parseFloat(document.getElementById('weight-input').value) || 0;
         this.updateWeight(0);
-        this.logActivity('scale', `Scale tared (was ${currentWeight})`);
+        // This log message is from the user's request
+        this.logActivity('scale', 'Scale tared');
     }
 
     zeroScale() {
@@ -663,6 +685,28 @@ class POSSimulatorPanel {
         this.updateDisplayPreview();
         this.sendMessage('UPDATE_DISPLAY', { line1: '', line2: '' });
         this.logActivity('display', 'Display cleared');
+    }
+
+    updateDisplayBrightness(value) {
+        const brightnessMap = {
+            '1': '0.4',
+            '2': '0.6',
+            '3': '0.8',
+            '4': '1.0'
+        };
+        const display = document.querySelector('.display-screen');
+        if (display) {
+            display.style.opacity = brightnessMap[value] || '1.0';
+        }
+        this.logActivity('display', `Brightness set to level ${value}`);
+    }
+
+    toggleDisplayBlink(isBlinking) {
+        const display = document.querySelector('.display-screen');
+        if (display) {
+            display.classList.toggle('blinking', isBlinking);
+        }
+        this.logActivity('display', `Blinking ${isBlinking ? 'enabled' : 'disabled'}`);
     }
 
     // Utility Methods

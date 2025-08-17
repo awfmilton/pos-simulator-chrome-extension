@@ -40,6 +40,9 @@ class POSContentScript {
             if (request.action === 'INJECT_INPUT') {
                 this.injectInput(request.data);
             }
+            if (request.action === 'UPDATE_SCALE_ON_PAGE') {
+                this.updateScaleOnPage(request.data);
+            }
         });
 
         this.port.onDisconnect.addListener(() => {
@@ -145,6 +148,13 @@ class POSContentScript {
     findFirstVisibleInput() {
         const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input:not([type]), textarea');
         return Array.from(inputs).find(input => this.isElementVisible(input) && !input.disabled && !input.readOnly);
+    }
+
+    updateScaleOnPage(data) {
+        window.postMessage({
+            type: 'UPDATE_SCALE_VARIABLES',
+            ...data
+        }, '*');
     }
 }
 
