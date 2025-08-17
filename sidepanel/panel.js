@@ -199,6 +199,27 @@ class POSSimulatorPanel {
             console.log('[USER-ACTION] Clicked "Cancel Settings"');
             this.hideSettings();
         });
+
+        // Add to setupEventListeners method:
+        document.getElementById('generate-dl-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Generate DL"');
+            this.generateSpecificAAMVA('DL');
+        });
+
+        document.getElementById('generate-id-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Generate ID"');
+            this.generateSpecificAAMVA('ID');
+        });
+
+        // Show/hide AAMVA buttons based on format selection
+        document.getElementById('barcode-format').addEventListener('change', (e) => {
+            const aamvaButtons = document.getElementById('aamva-specific-buttons');
+            if (e.target.value === 'aamva-pdf417') {
+                aamvaButtons.style.display = 'flex';
+            } else {
+                aamvaButtons.style.display = 'none';
+            }
+        });
     }
 
 
@@ -483,11 +504,27 @@ class POSSimulatorPanel {
 
         let testBarcode;
         if (format === 'aamva-pdf417') {
-            testBarcode = this.aamvaGenerator.generate();
+            // Random choice between DL and ID, or let user specify
+            const cardTypes = ['DL', 'ID'];
+            const randomCardType = cardTypes[Math.floor(Math.random() * cardTypes.length)];
+            testBarcode = this.aamvaGenerator.generate(randomCardType);
+
+            // Log what type was generated for debugging
+            console.log(`[PANEL] Generated AAMVA ${randomCardType} barcode`);
+            this.logActivity('scanner', `Generated AAMVA ${randomCardType} test barcode`);
         } else {
             testBarcode = this.testData.barcodes[format] || 'TEST123456';
         }
+
         barcodeInput.value = testBarcode;
+    }
+
+    // Add the new method:
+    generateSpecificAAMVA(cardType) {
+        const barcodeInput = document.getElementById('barcode-input');
+        const testBarcode = this.aamvaGenerator.generate(cardType);
+        barcodeInput.value = testBarcode;
+        this.logActivity('scanner', `Generated AAMVA ${cardType} test barcode`);
     }
 
     // MSR Methods
