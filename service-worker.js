@@ -156,9 +156,40 @@ class PeripheralSimulatorService {
 
 
     handleRawData(request) {
-        console.log(`[SW] Received raw data from ${request.source} for device ${request.deviceType}`, request);
+        console.log(`[SW] Received ${request.connectionType || request.source} printer data:`, request);
 
-        // Handle cash drawer commands
+        if (request.deviceType === 'printer') {
+            // Map connection types to printer states
+            const connectionMap = {
+                'webusb': 'usb',
+                'webbluetooth': 'bluetooth',
+                'webserial': 'serial',
+                'network': 'network'
+            };
+
+            const printerType = connectionMap[request.source] || 'usb';
+
+            if (this.printerStates[printerType]?.on) {
+                if (this.sidePanelPort) {
+                    this.sidePanelPort.postMessage({
+                        type: 'PRINT_DATA_RECEIVED',
+                        payload: request.payload,
+                        source: request.source,
+                        deviceType: request.deviceType,
+                        brand: request.brand || this.printerStates[printerType].brand,
+                        model: request.model,
+                        connectionType: request.connectionType,
+                        contentType: request.contentType,
+                        endpoint: request.endpoint
+                    });
+                }
+            } else {
+                console.log(`[SW] ${printerType} printer is disabled, ignoring data`);
+            }
+            return; // Done handling printer data
+        }
+
+        // Handle other device types...
         if (request.deviceType === 'cash-drawer') {
             if (this.sidePanelPort) {
                 console.log('[SW] Forwarding drawer command to side panel.');
@@ -172,7 +203,6 @@ class PeripheralSimulatorService {
             return;
         }
 
-        // Handle scale data forwarding
         if (request.deviceType === 'scale') {
             if (this.sidePanelPort) {
                 this.sidePanelPort.postMessage({
@@ -185,44 +215,16 @@ class PeripheralSimulatorService {
             return;
         }
 
-        // Handle printer and other device data
-        let printerType; // This is the connection type: usb, bluetooth, etc.
-        switch (request.source) {
-            case 'webhid':
-                printerType = 'serial'; // Treat HID as serial for line displays
-                break;
-            case 'webusb':
-                printerType = 'usb';
-                break;
-            case 'webbluetooth':
-                printerType = 'bluetooth';
-                break;
-            case 'webserial':
-                printerType = 'serial';
-                break;
-            case 'network':
-                printerType = 'network';
-                break;
-            default:
-                console.warn(`[SW] Unknown raw data source: ${request.source}`);
-                return;
-        }
-
-        if (this.printerStates[printerType] && this.printerStates[printerType].on) {
-            if (this.sidePanelPort) {
-                console.log(`[SW] Forwarding print data from ${printerType} to side panel.`);
+        if (request.deviceType === 'line-display') {
+             if (this.sidePanelPort) {
                 this.sidePanelPort.postMessage({
-                    type: 'PRINT_DATA_RECEIVED',
+                    type: 'PRINT_DATA_RECEIVED', // Reuse for now
                     payload: request.payload,
                     source: request.source,
                     deviceType: request.deviceType,
-                    brand: request.brand || this.printerStates[printerType].brand
+                    brand: 'line-display'
                 });
-            } else {
-                console.warn(`[SW] Side panel not connected. Cannot forward print data from ${printerType}.`);
             }
-        } else {
-            console.log(`[SW] Printer ${printerType} is turned off. Ignoring raw data.`);
         }
     }
 
