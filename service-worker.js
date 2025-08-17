@@ -104,6 +104,14 @@ class PeripheralSimulatorService {
                     this.handleBarcodeScan(msg.data);
                 }
                 break;
+            case 'UPDATE_SCALE':
+                if (msg.data) {
+                    this.broadcastToContentScripts({
+                        action: 'UPDATE_SCALE_ON_PAGE',
+                        data: msg.data
+                    });
+                }
+                break;
         }
     }
 
@@ -113,6 +121,16 @@ class PeripheralSimulatorService {
             value: data.barcode,
             simulateEnter: data.simulateEnter || true
         });
+    }
+
+    broadcastToContentScripts(message) {
+        for (const port of this.contentScriptPorts.values()) {
+            try {
+                port.postMessage(message);
+            } catch (error) {
+                console.error('[SW] Error broadcasting to content script:', error);
+            }
+        }
     }
 
     async injectInputToActivePage(data) {
@@ -138,7 +156,22 @@ class PeripheralSimulatorService {
 
 
     handleRawData(request) {
-        console.log(`[SW] Received raw data from ${request.source} for brand ${request.brand || 'N/A'}`, request);
+        console.log(`[SW] Received raw data from ${request.source} for device ${request.deviceType}`, request);
+
+        // Handle scale data forwarding
+        if (request.deviceType === 'scale') {
+            if (this.sidePanelPort) {
+                this.sidePanelPort.postMessage({
+                    type: 'SCALE_DATA_RECEIVED',
+                    payload: request.payload,
+                    source: request.source,
+                    scaleType: request.scaleType // e.g., 'mettlerToledo'
+                });
+            }
+            return; // Scale data does not need further processing here
+        }
+
+        // Handle printer and other device data
         let printerType; // This is the connection type: usb, bluetooth, etc.
         switch (request.source) {
             case 'webhid':
@@ -169,7 +202,7 @@ class PeripheralSimulatorService {
                     payload: request.payload,
                     source: request.source,
                     deviceType: request.deviceType,
-                    brand: request.brand || this.printerStates[printerType].brand // Pass intercepted brand, or fall back to selected brand
+                    brand: request.brand || this.printerStates[printerType].brand
                 });
             } else {
                 console.warn(`[SW] Side panel not connected. Cannot forward print data from ${printerType}.`);
