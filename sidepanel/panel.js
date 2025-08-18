@@ -199,6 +199,14 @@ class POSSimulatorPanel {
             console.log('[USER-ACTION] Clicked "Cancel Settings"');
             this.hideSettings();
         });
+        
+        // Theme selection
+        document.getElementById('theme-preset-select').addEventListener('change', (e) => {
+            console.log(`[USER-ACTION] Changed theme to: ${e.target.value}`);
+            this.applyTheme(e.target.value);
+            this.updateThemePreview(e.target.value);
+            this.saveTheme(e.target.value); // Auto-save theme changes
+        });
 
         // Add to setupEventListeners method:
         document.getElementById('generate-dl-btn').addEventListener('click', () => {
@@ -847,6 +855,97 @@ class POSSimulatorPanel {
         }
     }
 
+    // Theme Management Functions
+    applyTheme(themeName) {
+        // Remove all existing theme classes
+        const themeClasses = ['theme-default', 'theme-dark', 'theme-dos-green', 'theme-dos-red', 'theme-dos-white', 'theme-lcars', 'theme-futuristic'];
+        document.body.classList.remove(...themeClasses);
+        
+        // Apply the selected theme
+        if (themeName !== 'default') {
+            document.body.classList.add(`theme-${themeName}`);
+        }
+        
+        console.log(`[THEME] Applied theme: ${themeName}`);
+        this.updateStatus(`Theme changed to ${this.getThemeDisplayName(themeName)}`);
+    }
+
+    updateThemePreview(themeName) {
+        const preview = document.getElementById('theme-preview');
+        const previewCard = preview.querySelector('.preview-card');
+        const previewButton = preview.querySelector('.preview-button');
+        const previewText = preview.querySelector('.preview-text');
+        
+        // Reset preview classes
+        const themeClasses = ['theme-default', 'theme-dark', 'theme-dos-green', 'theme-dos-red', 'theme-dos-white', 'theme-lcars', 'theme-futuristic'];
+        preview.classList.remove(...themeClasses.map(cls => `preview-${cls}`));
+        
+        // Apply preview theme styles
+        if (themeName !== 'default') {
+            preview.classList.add(`preview-theme-${themeName}`);
+        }
+        
+        // Update preview content based on theme
+        switch (themeName) {
+            case 'dos-green':
+                previewButton.textContent = 'EXECUTE';
+                previewText.textContent = 'C:\\DOS> READY';
+                break;
+            case 'dos-red':
+                previewButton.textContent = 'EXECUTE';
+                previewText.textContent = 'C:\\DOS> READY';
+                break;
+            case 'dos-white':
+                previewButton.textContent = 'EXECUTE';
+                previewText.textContent = 'C:\\DOS> READY';
+                break;
+            case 'lcars':
+                previewButton.textContent = 'ENGAGE';
+                previewText.textContent = 'LCARS ONLINE';
+                break;
+            case 'futuristic':
+                previewButton.textContent = 'INITIALIZE';
+                previewText.textContent = 'System Ready';
+                break;
+            case 'dark':
+                previewButton.textContent = 'Primary Button';
+                previewText.textContent = 'Dark theme enabled';
+                break;
+            default:
+                previewButton.textContent = 'Primary Button';
+                previewText.textContent = 'Sample text content';
+        }
+    }
+
+    getThemeDisplayName(themeName) {
+        const themeNames = {
+            'default': 'Default',
+            'dark': 'Dark Mode',
+            'dos-green': 'DOS Terminal (Green)',
+            'dos-red': 'DOS Terminal (Red)',
+            'dos-white': 'DOS Terminal (White)',
+            'lcars': 'Star Trek LCARS',
+            'futuristic': 'Clean Futuristic'
+        };
+        return themeNames[themeName] || themeName;
+    }
+
+    loadTheme() {
+        chrome.storage.local.get('posSimulatorTheme', (result) => {
+            const theme = result.posSimulatorTheme || 'default';
+            document.getElementById('theme-preset-select').value = theme;
+            this.applyTheme(theme);
+            this.updateThemePreview(theme);
+            console.log(`[THEME] Loaded saved theme: ${theme}`);
+        });
+    }
+
+    saveTheme(themeName) {
+        chrome.storage.local.set({ posSimulatorTheme: themeName }, () => {
+            console.log(`[THEME] Saved theme: ${themeName}`);
+        });
+    }
+
     showSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
     }
@@ -861,21 +960,33 @@ class POSSimulatorPanel {
             debugMode: document.getElementById('debug-mode').checked,
             autoDetectInputs: document.getElementById('auto-detect-inputs').checked
         };
-        chrome.storage.local.set({ posSimulatorSettings: settings }, () => {
+        const selectedTheme = document.getElementById('theme-preset-select').value;
+        
+        chrome.storage.local.set({ 
+            posSimulatorSettings: settings,
+            posSimulatorTheme: selectedTheme
+        }, () => {
             this.updateStatus('Settings saved');
             this.hideSettings();
             this.sendMessage('SETTINGS_UPDATED', settings);
+            this.saveTheme(selectedTheme);
         });
     }
 
     loadSettings() {
-        chrome.storage.local.get('posSimulatorSettings', (result) => {
+        chrome.storage.local.get(['posSimulatorSettings', 'posSimulatorTheme'], (result) => {
             if (result.posSimulatorSettings) {
                 const settings = result.posSimulatorSettings;
                 document.getElementById('target-url').value = settings.targetUrl || '';
                 document.getElementById('debug-mode').checked = settings.debugMode || false;
                 document.getElementById('auto-detect-inputs').checked = settings.autoDetectInputs !== false;
             }
+            
+            // Load theme
+            const theme = result.posSimulatorTheme || 'default';
+            document.getElementById('theme-preset-select').value = theme;
+            this.applyTheme(theme);
+            this.updateThemePreview(theme);
         });
     }
 }
