@@ -938,10 +938,13 @@ function createBluetoothPrinterDevice(brand, model) {
         },
 
         getPrimaryService: async function(serviceUuid) {
-            if (serviceUuid === bluetoothPrinterServices.PRINT_SERVICE) {
-                return Promise.resolve(printService);
+            console.log(`[Bluetooth] Service requested: ${serviceUuid}`);
+            // For compatibility, we'll return the print service even if the UUID doesn't match.
+            // This handles cases where the POS might be using a proprietary or different standard UUID.
+            if (serviceUuid !== bluetoothPrinterServices.PRINT_SERVICE) {
+                console.warn(`[Bluetooth] Non-standard service UUID detected. Expected ${bluetoothPrinterServices.PRINT_SERVICE}.`);
             }
-            throw new Error('Service not found');
+            return Promise.resolve(printService);
         }
     };
 
