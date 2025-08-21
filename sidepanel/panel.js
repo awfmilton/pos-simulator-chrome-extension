@@ -71,6 +71,12 @@ class POSSimulatorPanel {
             }
         };
         this.port = null;
+
+        // Print job buffering
+        this.printDataBuffer = [];
+        this.printDataTimer = null;
+        this.lastPrintInfo = {};
+
         this.init();
     }
 
@@ -323,94 +329,69 @@ class POSSimulatorPanel {
     }
 
     handlePrintData(data, deviceType, brand = 'epson') {
-        // ... existing line display handling ...
-        if (deviceType === 'line-display') {
-            this.logActivity('display', `Line display data received (${data.length} bytes)`);
-            const uint8Data = new Uint8Array(data);
-            const command = this.lineDisplayParser.parseCommand(uint8Data);
-
-            let line1 = document.getElementById('display-line1');
-            let line2 = document.getElementById('display-line2');
-
-            switch (command.command) {
-                case 'clear':
-                    line1.textContent = ' '.repeat(20);
-                    line2.textContent = ' '.repeat(20);
-                    this.logActivity('display', 'Display cleared');
-                    break;
-                case 'text':
-                    // This is a naive implementation that overwrites line 1.
-                    // A real implementation would need to handle cursor position commands.
-                    line1.textContent = (command.data + ' '.repeat(20)).substring(0, 20);
-                    this.logActivity('display', `Display text: "${command.data}"`);
-                    break;
-                case 'position':
-                    this.logActivity('display', 'Position command received (not implemented)');
-                    break;
-                default:
-                    this.logActivity('display', `Unknown command received: ${command.hex}`);
-                    break;
-            }
-            // Update the input fields to reflect the change
-            document.getElementById('line1-input').value = line1.textContent.trim();
-            document.getElementById('line2-input').value = line2.textContent.trim();
-            return;
+        // If the source of the print job changes, process the old buffer immediately.
+        if (this.lastPrintInfo.deviceType && this.lastPrintInfo.deviceType !== deviceType) {
+            this._processBufferedPrintData();
         }
 
+        // Clear any existing timer to reset the timeout.
+        if (this.printDataTimer) {
+            clearTimeout(this.printDataTimer);
+        }
+
+        // Add the new data chunk to the buffer.
+        this.printDataBuffer.push(new Uint8Array(data));
+        this.lastPrintInfo = { deviceType, brand };
+
+        // Set a timer to process the buffer after a short delay.
+        // This allows subsequent chunks of the same print job to be collected.
+        this.printDataTimer = setTimeout(() => this._processBufferedPrintData(), 100); // 100ms delay
+    }
+
+    _processBufferedPrintData() {
+        if (this.printDataBuffer.length === 0) {
+            return; // Nothing to process
+        }
+
+        const { deviceType, brand } = this.lastPrintInfo;
         const receiptContentEl = document.querySelector('.receipt-content');
-        console.log(`[PRINT] Received print data for device: ${deviceType}, brand: ${brand}, data length: ${data ? data.length : 0}`);
+        console.log(`[PRINT-BUFFER] Processing buffered data for device: ${deviceType}, brand: ${brand}, chunks: ${this.printDataBuffer.length}`);
 
         try {
-            if (!data || data.length === 0) {
-                console.warn('[PRINT] Received empty or null print data. No action taken.');
-                this.logActivity('printer', 'Received empty print job.');
-                return;
+            // Concatenate all buffered chunks into a single Uint8Array
+            const totalLength = this.printDataBuffer.reduce((acc, val) => acc + val.length, 0);
+            const fullPrintData = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of this.printDataBuffer) {
+                fullPrintData.set(chunk, offset);
+                offset += chunk.length;
             }
 
-            this.logActivity('printer', `Print job received (${brand}, ${data.length} bytes)`);
-            let uint8Data;
+            this.logActivity('printer', `Processing buffered job (${brand}, ${fullPrintData.length} bytes)`);
 
-            // Handle different data formats...
-            if (deviceType === 'network-printer' && typeof data === 'string') {
-                if (data.trim().startsWith('<')) {
-                     // This is ePOS XML, we won't get drawer kick commands from here typically.
-                     console.log('[PRINT] Handling as network printer XML string.');
-                     const parser = new DOMParser();
-                     const xmlDoc = parser.parseFromString(data, "text/xml");
-                     const textNodes = xmlDoc.getElementsByTagName('text');
-                     let receiptText = '';
-                     for (let i = 0; i < textNodes.length; i++) {
-                         receiptText += textNodes[i].textContent;
-                     }
-                     this.displayReceipt(receiptText); // just display text for now
-                     return;
-                } else {
-                    uint8Data = new Uint8Array(data.split('').map(char => char.charCodeAt(0)));
-                }
-            } else {
-                uint8Data = new Uint8Array(data);
+            const parsedData = this.escposParser.parse(fullPrintData, brand);
+            console.log('[PRINT-BUFFER] Successfully parsed buffered data:', parsedData);
+
+            // Check for drawer kick commands
+            const drawerCommands = parsedData.commands.filter(cmd => cmd.name === 'drawer_kick');
+            if (drawerCommands.length > 0) {
+                console.log(`[PRINT-BUFFER] Found ${drawerCommands.length} drawer kick command(s) in buffered data!`);
+                this.handleDrawerKickFromPrinter(drawerCommands.length, brand);
             }
 
-            if (uint8Data) {
-                console.log('[PRINT] Converted data to Uint8Array for parsing.');
-                const parsedData = this.escposParser.parse(uint8Data, brand);
-                console.log('[PRINT] Successfully parsed binary data:', parsedData);
+            const receiptHtml = this.escposParser.renderToHTML(parsedData);
+            console.log('[PRINT-BUFFER] Successfully rendered HTML from buffered data.');
+            receiptContentEl.innerHTML = receiptHtml;
 
-                // Check for drawer kick commands
-                const drawerCommands = parsedData.commands.filter(cmd => cmd.name === 'drawer_kick');
-                if (drawerCommands.length > 0) {
-                    console.log(`[PRINT] Found ${drawerCommands.length} drawer kick command(s)!`);
-                    this.handleDrawerKickFromPrinter(drawerCommands.length, brand);
-                }
-
-                const receiptHtml = this.escposParser.renderToHTML(parsedData);
-                console.log('[PRINT] Successfully rendered HTML from parsed data.');
-                receiptContentEl.innerHTML = receiptHtml;
-            }
         } catch (error) {
-            console.error('[PRINT] Critical error in handlePrintData:', error);
+            console.error('[PRINT-BUFFER] Critical error in _processBufferedPrintData:', error);
             this.logActivity('printer', `ERROR: ${error.message}`);
-            receiptContentEl.innerHTML = `Error processing print data: ${error.message}`;
+            receiptContentEl.innerHTML = `Error processing buffered print data: ${error.message}`;
+        } finally {
+            // Clear the buffer and timer for the next job
+            this.printDataBuffer = [];
+            this.printDataTimer = null;
+            this.lastPrintInfo = {};
         }
     }
 
