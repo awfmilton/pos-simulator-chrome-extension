@@ -351,21 +351,51 @@ License: personal use $5/month, business use $100/month
                 <button class="close-btn" id="close-settings-btn">×</button>
             </div>
             <div class="modal-body">
-                <div class="input-group">
-                    <label for="target-url">Target POS URL Pattern:</label>
-                    <input type="text" id="target-url" placeholder="https://yourpos.com/*">
+                <div class="settings-section">
+                    <h3>🎨 Appearance & Themes</h3>
+                    <div class="theme-presets-container">
+                        <div class="input-group">
+                            <label for="theme-preset-select">Theme Preset:</label>
+                            <select id="theme-preset-select">
+                                <option value="default">Default Theme</option>
+                                <option value="dark">Dark Mode</option>
+                                <option value="dos-green">DOS Terminal - Green</option>
+                                <option value="dos-red">DOS Terminal - Red</option>
+                                <option value="dos-white">DOS Terminal - White</option>
+                                <option value="lcars">Star Trek LCARS</option>
+                                <option value="futuristic">Clean Futuristic</option>
+                            </select>
+                        </div>
+                        <div class="theme-preview" id="theme-preview">
+                            <div class="preview-card">
+                                <div class="preview-header">Preview</div>
+                                <div class="preview-content">
+                                    <div class="preview-button">Primary Button</div>
+                                    <div class="preview-text">Sample text content</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>
-                        <input type="checkbox" id="debug-mode">
-                        Enable Debug Mode
-                    </label>
-                </div>
-                <div class="input-group">
-                    <label>
-                        <input type="checkbox" id="auto-detect-inputs">
-                        Auto-detect Input Fields
-                    </label>
+                
+                <div class="settings-section">
+                    <h3>⚙️ General Settings</h3>
+                    <div class="input-group">
+                        <label for="target-url">Target POS URL Pattern:</label>
+                        <input type="text" id="target-url" placeholder="https://yourpos.com/*">
+                    </div>
+                    <div class="input-group">
+                        <label>
+                            <input type="checkbox" id="debug-mode">
+                            Enable Debug Mode
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label>
+                            <input type="checkbox" id="auto-detect-inputs">
+                            Auto-detect Input Fields
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
