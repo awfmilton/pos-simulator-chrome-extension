@@ -77,11 +77,11 @@ class AAMVAGenerator {
         const state = this._getRandom(this.data.states);
         const selectedCardType = cardType || this._getRandom(this.data.cardTypes);
 
-        // AAMVA Header format: @[CR][LF][RS]ANSI [IIN][Version][Jurisdiction Version][Number of Entries][LF]
+        // AAMVA Header format: @[RS][CR]ANSI [IIN][Version][Jurisdiction Version][Number of Entries][LF]
         const complianceIndicator = "@";
-        const dataElementSeparator = "\r\n"; // Proper CRLF
+        const dataElementSeparator = "\n"; // AAMVA Spec uses LF for element separation
         const recordSeparator = "\x1e"; // ASCII RS (Record Separator)
-        const segmentTerminator = "\r"; // CR only for segment terminator
+        const segmentTerminator = "\r"; // ASCII CR (Carriage Return) for segment termination
 
         // File format
         const fileType = "ANSI ";
@@ -90,8 +90,8 @@ class AAMVAGenerator {
         const jurisdictionVersion = "00"; // Updated to 00 for better compatibility
         const numEntries = "01"; // One subfile
 
-        // Build the header
-        const header = `${complianceIndicator}${dataElementSeparator}${recordSeparator}${segmentTerminator}${fileType}${issuerId}${aamvaVersion}${jurisdictionVersion}${numEntries}${dataElementSeparator}`;
+        // Build the header according to AAMVA spec: @[RS][CR]ANSI...[LF]
+        const header = `${complianceIndicator}${recordSeparator}${segmentTerminator}${fileType}${issuerId}${aamvaVersion}${jurisdictionVersion}${numEntries}${dataElementSeparator}`;
 
         // Subfile designator (DL for Driver's License, ID for ID Card)
         const subfileDesignator = selectedCardType;

@@ -667,6 +667,572 @@ button {
     background: var(--secondary-color);
 }
 
+/* Settings Sections */
+.settings-section {
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.settings-section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+/* Theme Presets Container */
+.theme-presets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.theme-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    text-align: center;
+}
+
+.preview-card {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    padding: 12px;
+    max-width: 200px;
+    margin: 0 auto;
+}
+
+.preview-header {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+.preview-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.preview-button {
+    background: var(--primary-color);
+    color: white;
+    padding: 6px 12px;
+    border-radius: var(--border-radius);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.preview-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Theme Preview Styles */
+.theme-preview.preview-theme-dos-green .preview-card {
+    background: #000000;
+    border-color: #004400;
+}
+
+.theme-preview.preview-theme-dos-green .preview-header {
+    color: #00ff00;
+    border-color: #004400;
+}
+
+.theme-preview.preview-theme-dos-green .preview-button {
+    background: #00ff00;
+    color: #000000;
+}
+
+.theme-preview.preview-theme-dos-green .preview-text {
+    color: #00aa00;
+    font-family: 'Courier New', monospace;
+}
+
+.theme-preview.preview-theme-dos-red .preview-card {
+    background: #000000;
+    border-color: #440000;
+}
+
+.theme-preview.preview-theme-dos-red .preview-header {
+    color: #ff0000;
+    border-color: #440000;
+}
+
+.theme-preview.preview-theme-dos-red .preview-button {
+    background: #ff0000;
+    color: #000000;
+}
+
+.theme-preview.preview-theme-dos-red .preview-text {
+    color: #aa0000;
+    font-family: 'Courier New', monospace;
+}
+
+.theme-preview.preview-theme-dos-white .preview-card {
+    background: #000000;
+    border-color: #444444;
+}
+
+.theme-preview.preview-theme-dos-white .preview-header {
+    color: #ffffff;
+    border-color: #444444;
+}
+
+.theme-preview.preview-theme-dos-white .preview-button {
+    background: #ffffff;
+    color: #000000;
+}
+
+.theme-preview.preview-theme-dos-white .preview-text {
+    color: #aaaaaa;
+    font-family: 'Courier New', monospace;
+}
+
+.theme-preview.preview-theme-lcars .preview-card {
+    background: #0f0f23;
+    border-color: #333366;
+    border-radius: 15px;
+}
+
+.theme-preview.preview-theme-lcars .preview-header {
+    color: #ff9900;
+    border-color: #333366;
+}
+
+.theme-preview.preview-theme-lcars .preview-button {
+    background: #ff9900;
+    color: #000000;
+    border-radius: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.theme-preview.preview-theme-lcars .preview-text {
+    color: #9999ff;
+}
+
+.theme-preview.preview-theme-futuristic .preview-card {
+    background: linear-gradient(135deg, #0a0a0f, #12121a);
+    border-color: #2a2a35;
+}
+
+.theme-preview.preview-theme-futuristic .preview-header {
+    color: #ffffff;
+    border-color: #2a2a35;
+}
+
+.theme-preview.preview-theme-futuristic .preview-button {
+    background: linear-gradient(135deg, #00d4ff, #0099cc);
+    color: white;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+}
+
+.theme-preview.preview-theme-futuristic .preview-text {
+    color: #a0a0b0;
+}
+
+.theme-preview.preview-theme-dark .preview-card {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.theme-preview.preview-theme-dark .preview-header {
+    color: #f9fafb;
+    border-color: #374151;
+}
+
+.theme-preview.preview-theme-dark .preview-button {
+    background: #3b82f6;
+    color: white;
+}
+
+.theme-preview.preview-theme-dark .preview-text {
+    color: #9ca3af;
+}
+
+/* Theme Variants */
+/* DOS Terminal - Green Theme */
+body.theme-dos-green {
+    --primary-color: #00ff00;
+    --primary-hover: #00cc00;
+    --secondary-color: #008800;
+    --secondary-hover: #006600;
+    --success-color: #00ff00;
+    --warning-color: #ffff00;
+    --danger-color: #ff0000;
+    --danger-hover: #cc0000;
+    --background: #000000;
+    --surface: #111111;
+    --surface-dark: #222222;
+    --text-primary: #00ff00;
+    --text-secondary: #00aa00;
+    --border: #004400;
+    --border-focus: #00ff00;
+    --shadow: 0 1px 3px rgba(0, 255, 0, 0.2);
+    --shadow-lg: 0 10px 25px rgba(0, 255, 0, 0.3);
+}
+
+body.theme-dos-green * {
+    font-family: 'Courier New', monospace !important;
+}
+
+body.theme-dos-green .receipt-paper {
+    background: #000000;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+body.theme-dos-green .receipt-line {
+    color: #00ff00;
+}
+
+body.theme-dos-green .drawer {
+    background: linear-gradient(45deg, #002200, #004400);
+}
+
+/* DOS Terminal - Red Theme */
+body.theme-dos-red {
+    --primary-color: #ff0000;
+    --primary-hover: #cc0000;
+    --secondary-color: #880000;
+    --secondary-hover: #660000;
+    --success-color: #ff4444;
+    --warning-color: #ff8800;
+    --danger-color: #ff0000;
+    --danger-hover: #cc0000;
+    --background: #000000;
+    --surface: #111111;
+    --surface-dark: #222222;
+    --text-primary: #ff0000;
+    --text-secondary: #aa0000;
+    --border: #440000;
+    --border-focus: #ff0000;
+    --shadow: 0 1px 3px rgba(255, 0, 0, 0.2);
+    --shadow-lg: 0 10px 25px rgba(255, 0, 0, 0.3);
+}
+
+body.theme-dos-red * {
+    font-family: 'Courier New', monospace !important;
+}
+
+body.theme-dos-red .receipt-paper {
+    background: #000000;
+    color: #ff0000;
+    border: 1px solid #ff0000;
+}
+
+body.theme-dos-red .receipt-line {
+    color: #ff0000;
+}
+
+body.theme-dos-red .drawer {
+    background: linear-gradient(45deg, #220000, #440000);
+}
+
+body.theme-dos-red .scale-display,
+body.theme-dos-red .display-screen {
+    color: #ff0000;
+}
+
+body.theme-dos-red .indicator {
+    border-color: #ff0000;
+}
+
+body.theme-dos-red .display-line {
+    border-bottom-color: rgba(255, 0, 0, 0.2);
+}
+
+/* DOS Terminal - White Theme */
+body.theme-dos-white {
+    --primary-color: #ffffff;
+    --primary-hover: #cccccc;
+    --secondary-color: #888888;
+    --secondary-hover: #666666;
+    --success-color: #aaaaaa;
+    --warning-color: #dddddd;
+    --danger-color: #ffffff;
+    --danger-hover: #cccccc;
+    --background: #000000;
+    --surface: #111111;
+    --surface-dark: #222222;
+    --text-primary: #ffffff;
+    --text-secondary: #aaaaaa;
+    --border: #444444;
+    --border-focus: #ffffff;
+    --shadow: 0 1px 3px rgba(255, 255, 255, 0.2);
+    --shadow-lg: 0 10px 25px rgba(255, 255, 255, 0.3);
+}
+
+body.theme-dos-white * {
+    font-family: 'Courier New', monospace !important;
+}
+
+body.theme-dos-white .receipt-paper {
+    background: #000000;
+    color: #ffffff;
+    border: 1px solid #ffffff;
+}
+
+body.theme-dos-white .receipt-line {
+    color: #ffffff;
+}
+
+body.theme-dos-white .drawer {
+    background: linear-gradient(45deg, #222222, #444444);
+}
+
+body.theme-dos-white .scale-display,
+body.theme-dos-white .display-screen {
+    color: #ffffff;
+}
+
+body.theme-dos-white .indicator {
+    border-color: #ffffff;
+}
+
+body.theme-dos-white .display-line {
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Star Trek LCARS Theme */
+body.theme-lcars {
+    --primary-color: #ff9900;
+    --primary-hover: #ff7700;
+    --secondary-color: #9999ff;
+    --secondary-hover: #7777ff;
+    --success-color: #00ffff;
+    --warning-color: #ffff00;
+    --danger-color: #ff0000;
+    --danger-hover: #cc0000;
+    --background: #000000;
+    --surface: #0f0f23;
+    --surface-dark: #1a1a3a;
+    --text-primary: #ff9900;
+    --text-secondary: #9999ff;
+    --border: #333366;
+    --border-focus: #ff9900;
+    --shadow: 0 1px 3px rgba(255, 153, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(255, 153, 0, 0.4);
+    --border-radius: 20px;
+    --border-radius-lg: 25px;
+}
+
+body.theme-lcars * {
+    font-family: 'Arial', sans-serif !important;
+    font-weight: 600 !important;
+}
+
+body.theme-lcars button {
+    border-radius: 25px !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 12px !important;
+}
+
+body.theme-lcars .tab-btn {
+    border-radius: 15px 15px 0 0 !important;
+}
+
+body.theme-lcars .input-group input,
+body.theme-lcars .input-group select {
+    border-radius: 15px !important;
+    border: 2px solid var(--border) !important;
+}
+
+body.theme-lcars .receipt-paper {
+    background: #0f0f23;
+    color: #ff9900;
+    border: 2px solid #ff9900;
+    border-radius: 15px;
+}
+
+body.theme-lcars .receipt-line {
+    color: #ff9900;
+}
+
+body.theme-lcars .drawer {
+    background: linear-gradient(45deg, #0f0f23, #1a1a3a);
+    border-radius: 25px !important;
+}
+
+body.theme-lcars .scale-display,
+body.theme-lcars .display-screen {
+    color: #00ffff;
+    border: 2px solid #00ffff;
+    border-radius: 15px;
+}
+
+body.theme-lcars .indicator {
+    border-color: #00ffff;
+    border-radius: 10px;
+}
+
+body.theme-lcars .display-line {
+    border-bottom-color: rgba(0, 255, 255, 0.3);
+}
+
+body.theme-lcars .activity-log,
+body.theme-lcars .settings-group {
+    border-radius: 15px !important;
+}
+
+body.theme-lcars .modal-content {
+    border-radius: 25px !important;
+}
+
+/* Clean Futuristic Theme */
+body.theme-futuristic {
+    --primary-color: #00d4ff;
+    --primary-hover: #00b8e6;
+    --secondary-color: #6c757d;
+    --secondary-hover: #5a6268;
+    --success-color: #00ff88;
+    --warning-color: #ffaa00;
+    --danger-color: #ff4757;
+    --danger-hover: #ff3742;
+    --background: #0a0a0f;
+    --surface: #12121a;
+    --surface-dark: #1a1a25;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0b0;
+    --border: #2a2a35;
+    --border-focus: #00d4ff;
+    --shadow: 0 4px 15px rgba(0, 212, 255, 0.1);
+    --shadow-lg: 0 15px 35px rgba(0, 212, 255, 0.2);
+    --border-radius: 12px;
+    --border-radius-lg: 16px;
+}
+
+body.theme-futuristic * {
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+body.theme-futuristic button {
+    background: linear-gradient(135deg, var(--primary-color), #0099cc) !important;
+    border: 1px solid rgba(0, 212, 255, 0.3) !important;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+body.theme-futuristic button:hover {
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.4) !important;
+    transform: translateY(-2px);
+}
+
+body.theme-futuristic .secondary-btn {
+    background: linear-gradient(135deg, var(--secondary-color), #4a5568) !important;
+    box-shadow: 0 0 15px rgba(108, 117, 125, 0.2);
+}
+
+body.theme-futuristic .input-group input,
+body.theme-futuristic .input-group select {
+    background: rgba(18, 18, 26, 0.8) !important;
+    border: 1px solid rgba(0, 212, 255, 0.3) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-futuristic .input-group input:focus,
+body.theme-futuristic .input-group select:focus {
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.theme-futuristic .receipt-paper {
+    background: linear-gradient(135deg, #0a0a0f, #12121a);
+    color: #00d4ff;
+    border: 1px solid #00d4ff;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+}
+
+body.theme-futuristic .receipt-line {
+    color: #00d4ff;
+}
+
+body.theme-futuristic .drawer {
+    background: linear-gradient(135deg, #12121a, #1a1a25);
+    box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+}
+
+body.theme-futuristic .scale-display,
+body.theme-futuristic .display-screen {
+    background: linear-gradient(135deg, #0a0a0f, #12121a);
+    color: #00ff88;
+    border: 1px solid #00ff88;
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.2);
+}
+
+body.theme-futuristic .indicator {
+    border-color: #00ff88;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+body.theme-futuristic .display-line {
+    border-bottom-color: rgba(0, 255, 136, 0.2);
+}
+
+body.theme-futuristic .activity-log,
+body.theme-futuristic .settings-group {
+    background: rgba(18, 18, 26, 0.6) !important;
+    border: 1px solid rgba(0, 212, 255, 0.2) !important;
+    backdrop-filter: blur(10px);
+}
+
+body.theme-futuristic .modal-content {
+    background: linear-gradient(135deg, #0a0a0f, #12121a) !important;
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 212, 255, 0.3);
+}
+
+body.theme-futuristic .header,
+body.theme-futuristic .footer {
+    background: rgba(10, 10, 15, 0.9) !important;
+    backdrop-filter: blur(20px);
+    border-color: rgba(0, 212, 255, 0.2) !important;
+}
+
+body.theme-futuristic .tab-nav {
+    background: rgba(10, 10, 15, 0.9) !important;
+    backdrop-filter: blur(20px);
+    border-color: rgba(0, 212, 255, 0.2) !important;
+}
+
+body.theme-futuristic .tab-btn.active {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 212, 255, 0.1)) !important;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+}
+
+/* Dark Mode (Enhanced) */
+body.theme-dark {
+    --primary-color: #3b82f6;
+    --primary-hover: #2563eb;
+    --secondary-color: #6b7280;
+    --secondary-hover: #4b5563;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --danger-hover: #dc2626;
+    --background: #1f2937;
+    --surface: #111827;
+    --surface-dark: #0f172a;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --border: #374151;
+    --border-focus: #3b82f6;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
 /* Utility Classes */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
