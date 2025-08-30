@@ -27,8 +27,11 @@ License: personal use $5/month, business use $100/month
             <button class="tab-btn active" data-tab="scanner">
                 📱 Scanner
             </button>
-            <button class="tab-btn" data-tab="msr">
-                💳 MSR
+            <button class="tab-btn" data-tab="keyboard">
+                ⌨️ Keyboard
+            </button>
+            <button class="tab-btn" data-tab="creditcard">
+                💳 Credit Card
             </button>
             <button class="tab-btn" data-tab="printer">
                 🖨️ Printer
@@ -97,39 +100,192 @@ License: personal use $5/month, business use $100/month
                 </div>
             </div>
 
-            <div class="tab-panel" id="msr-panel">
+            <div class="tab-panel" id="keyboard-panel">
                 <div class="panel-header">
-                    <h2>Magnetic Stripe Reader</h2>
-                    <div class="status-light" id="msr-status"></div>
+                    <h2>Virtual Keyboard</h2>
+                    <div class="status-light" id="keyboard-status"></div>
                 </div>
 
-                <div class="input-group">
-                    <label for="card-type">Card Type:</label>
-                    <select id="card-type">
-                        <option value="credit">Credit Card</option>
-                        <option value="debit">Debit Card</option>
-                        <option value="gift">Gift Card</option>
-                        <option value="loyalty">Loyalty Card</option>
-                    </select>
+                <div class="keyboard-mode-selector">
+                    <label>
+                        <input type="radio" name="keyboard-mode" value="full" checked>
+                        Full QWERTY Keyboard
+                    </label>
+                    <label>
+                        <input type="radio" name="keyboard-mode" value="keypad">
+                        Numeric Keypad Only
+                    </label>
                 </div>
 
-                <div class="input-group">
-                    <label for="track1-input">Track 1 Data:</label>
-                    <input type="text" id="track1-input" placeholder="%B4111111111111111^DOE/JOHN^2512101?">
+                <div class="virtual-keyboard-container" id="virtual-keyboard">
+                    <!-- Keyboard will be dynamically generated -->
                 </div>
 
-                <div class="input-group">
-                    <label for="track2-input">Track 2 Data:</label>
-                    <input type="text" id="track2-input" placeholder=";4111111111111111=25121010000100000?">
+                <div class="keyboard-controls">
+                    <div class="input-group">
+                        <label for="keyboard-text-input">Type Text:</label>
+                        <input type="text" id="keyboard-text-input" placeholder="Enter text to type">
+                        <button id="type-text-btn" class="secondary-btn">Type Text</button>
+                    </div>
+
+                    <div class="keyboard-settings">
+                        <label>
+                            <input type="checkbox" id="keyboard-caps-lock">
+                            Caps Lock
+                        </label>
+                        <label>
+                            <input type="checkbox" id="keyboard-num-lock" checked>
+                            Num Lock
+                        </label>
+                        <div class="input-group">
+                            <label for="typing-speed">Typing Speed:</label>
+                            <input type="range" id="typing-speed" min="1" max="10" value="5">
+                            <span id="typing-speed-value">5</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="button-group">
-                    <button id="swipe-btn" class="primary-btn">💳 Swipe Card</button>
-                    <button id="generate-card-btn" class="secondary-btn">🎲 Generate Test Card</button>
+                <div class="activity-log" id="keyboard-log">
+                    <h3>Key Activity</h3>
+                    <div class="log-content"></div>
+                </div>
+            </div>
+
+            <div class="tab-panel" id="creditcard-panel">
+                <div class="panel-header">
+                    <h2>Credit Card & Payment Terminal</h2>
+                    <div class="status-light" id="creditcard-status"></div>
                 </div>
 
-                <div class="activity-log" id="msr-log">
-                    <h3>Recent Swipes</h3>
+                <div class="payment-modes">
+                    <div class="mode-selector">
+                        <button class="mode-btn active" data-mode="msr">💳 MSR</button>
+                        <button class="mode-btn" data-mode="tap">📱 Tap to Pay</button>
+                        <button class="mode-btn" data-mode="chip">🔌 Chip</button>
+                        <button class="mode-btn" data-mode="stripe">💰 Stripe</button>
+                    </div>
+                </div>
+
+                <!-- MSR Mode -->
+                <div class="payment-mode-panel active" id="msr-mode">
+                    <div class="input-group">
+                        <label for="cc-provider">Card Provider:</label>
+                        <select id="cc-provider">
+                            <option value="visa">Visa</option>
+                            <option value="mastercard">MasterCard</option>
+                            <option value="amex">American Express</option>
+                            <option value="discover">Discover</option>
+                            <option value="jcb">JCB</option>
+                            <option value="dinersclub">Diners Club</option>
+                            <option value="unionpay">UnionPay</option>
+                        </select>
+                    </div>
+
+                    <div class="generated-card-display" id="card-display">
+                        <div class="card-visual">
+                            <div class="card-number">•••• •••• •••• ••••</div>
+                            <div class="card-holder">CARD HOLDER</div>
+                            <div class="card-expiry">MM/YY</div>
+                            <div class="card-cvv">CVV</div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="track1-input">Track 1 Data:</label>
+                        <input type="text" id="track1-input" placeholder="%B4111111111111111^DOE/JOHN^2512101?">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="track2-input">Track 2 Data:</label>
+                        <input type="text" id="track2-input" placeholder=";4111111111111111=25121010000100000?">
+                    </div>
+
+                    <div class="button-group">
+                        <button id="generate-card-btn" class="primary-btn">🎲 Generate Card</button>
+                        <button id="swipe-btn" class="secondary-btn">💳 Swipe Card</button>
+                    </div>
+                </div>
+
+                <!-- Tap to Pay Mode -->
+                <div class="payment-mode-panel" id="tap-mode">
+                    <div class="tap-interface">
+                        <div class="tap-area" id="tap-area">
+                            <div class="tap-indicator">📱</div>
+                            <div class="tap-text">Tap Card or Device</div>
+                            <div class="tap-animation" id="tap-animation"></div>
+                        </div>
+                    </div>
+
+                    <div class="nfc-settings">
+                        <div class="input-group">
+                            <label for="nfc-timeout">Transaction Timeout:</label>
+                            <select id="nfc-timeout">
+                                <option value="5">5 seconds</option>
+                                <option value="10" selected>10 seconds</option>
+                                <option value="15">15 seconds</option>
+                                <option value="30">30 seconds</option>
+                            </select>
+                        </div>
+
+                        <label>
+                            <input type="checkbox" id="nfc-sounds" checked>
+                            Enable NFC Sounds
+                        </label>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="simulate-tap-btn" class="primary-btn">📱 Simulate Tap</button>
+                        <button id="nfc-enable-btn" class="secondary-btn">📡 Enable NFC</button>
+                    </div>
+                </div>
+
+                <!-- Chip Mode -->
+                <div class="payment-mode-panel" id="chip-mode">
+                    <div class="chip-interface">
+                        <div class="chip-slot" id="chip-slot">
+                            <div class="chip-indicator">🔌</div>
+                            <div class="chip-text">Insert Chip Card</div>
+                            <div class="chip-card" id="chip-card" style="display: none;">💳</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="insert-chip-btn" class="primary-btn">🔌 Insert Card</button>
+                        <button id="remove-chip-btn" class="secondary-btn">↗️ Remove Card</button>
+                    </div>
+                </div>
+
+                <!-- Stripe Integration Mode -->
+                <div class="payment-mode-panel" id="stripe-mode">
+                    <div class="stripe-config">
+                        <div class="input-group">
+                            <label for="stripe-pk">Stripe Publishable Key:</label>
+                            <input type="text" id="stripe-pk" placeholder="pk_test_...">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="stripe-sk">Stripe Secret Key:</label>
+                            <input type="password" id="stripe-sk" placeholder="sk_test_...">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="stripe-amount">Amount (USD):</label>
+                            <input type="number" id="stripe-amount" step="0.01" min="0.50" placeholder="0.00">
+                        </div>
+
+                        <div class="stripe-status" id="stripe-status">
+                            <span class="status-text">Not Connected</span>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="stripe-connect-btn" class="primary-btn">🔗 Connect Stripe</button>
+                        <button id="stripe-payment-btn" class="secondary-btn" disabled>💰 Process Payment</button>
+                    </div>
+                </div>
+
+                <div class="activity-log" id="creditcard-log">
+                    <h3>Payment Activity</h3>
                     <div class="log-content"></div>
                 </div>
             </div>
@@ -198,6 +354,39 @@ License: personal use $5/month, business use $100/month
                 <div class="button-group">
                     <button id="test-print-btn" class="primary-btn">🖨️ Test Print</button>
                     <button id="clear-receipt-btn" class="secondary-btn">🗑️ Clear</button>
+                </div>
+
+                <div class="receipt-management">
+                    <h3>Receipt Management</h3>
+                    
+                    <div class="receipt-options">
+                        <div class="input-group">
+                            <label for="receipt-format">Download Format:</label>
+                            <select id="receipt-format">
+                                <option value="pdf">PDF</option>
+                                <option value="text">Text File</option>
+                                <option value="both">Both Formats</option>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="receipt-email">Email Address:</label>
+                            <input type="email" id="receipt-email" placeholder="alex@tbay.tk">
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="download-receipt-btn" class="secondary-btn">💾 Download Receipt</button>
+                        <button id="email-receipt-btn" class="secondary-btn">📧 Email Receipt</button>
+                        <button id="email-config-btn" class="secondary-btn">⚙️ Email Settings</button>
+                    </div>
+
+                    <div class="receipt-history" id="receipt-history">
+                        <h4>Recent Receipts</h4>
+                        <div class="history-list" id="receipt-history-list">
+                            <div class="history-item">No receipts generated yet</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="receipt-display" id="receipt-display">
@@ -405,8 +594,56 @@ License: personal use $5/month, business use $100/month
         </div>
     </div>
 
+    <!-- Email Configuration Modal -->
+    <div class="modal" id="email-config-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Email Configuration</h2>
+                <button class="close-btn" id="close-email-config-btn">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="smtp-server">SMTP Server:</label>
+                    <input type="text" id="smtp-server" placeholder="smtp.gmail.com">
+                </div>
+                <div class="input-group">
+                    <label for="smtp-port">SMTP Port:</label>
+                    <input type="number" id="smtp-port" value="587" min="1" max="65535">
+                </div>
+                <div class="input-group">
+                    <label for="smtp-email">Your Email:</label>
+                    <input type="email" id="smtp-email" placeholder="your-email@gmail.com">
+                </div>
+                <div class="input-group">
+                    <label for="smtp-password">App Password:</label>
+                    <input type="password" id="smtp-password" placeholder="Your app-specific password">
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="smtp-secure">
+                        Use SSL/TLS
+                    </label>
+                </div>
+                <div class="help-text">
+                    <p><strong>Gmail Setup:</strong></p>
+                    <p>1. Enable 2-factor authentication</p>
+                    <p>2. Generate an app-specific password</p>
+                    <p>3. Use smtp.gmail.com with port 587</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-email-config-btn" class="primary-btn">Save Configuration</button>
+                <button id="test-email-btn" class="secondary-btn">Send Test Email</button>
+                <button id="cancel-email-config-btn" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="aamva-generator.js"></script>
     <script src="escpos-parser.js"></script>
+    <script src="credit-card-generator.js"></script>
+    <script src="virtual-keyboard.js"></script>
+    <script src="receipt-manager.js"></script>
     <script src="panel.js"></script>
 </body>
 </html>

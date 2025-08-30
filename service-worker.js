@@ -112,6 +112,36 @@ class PeripheralSimulatorService {
                     });
                 }
                 break;
+            case 'KEYBOARD_INPUT':
+                if (msg.data) {
+                    this.handleKeyboardInput(msg.data);
+                }
+                break;
+            case 'MSR_SWIPE':
+                if (msg.data) {
+                    this.handleMSRSwipe(msg.data);
+                }
+                break;
+            case 'NFC_TAP':
+                if (msg.data) {
+                    this.handleNFCTap(msg.data);
+                }
+                break;
+            case 'CHIP_INSERT':
+                if (msg.data) {
+                    this.handleChipInsert(msg.data);
+                }
+                break;
+            case 'CHIP_REMOVE':
+                if (msg.data) {
+                    this.handleChipRemove(msg.data);
+                }
+                break;
+            case 'SEND_EMAIL':
+                if (msg.data) {
+                    this.handleSendEmail(msg.data);
+                }
+                break;
         }
     }
 
@@ -271,6 +301,109 @@ class PeripheralSimulatorService {
                 this.sidePanelPort.postMessage({
                     type: 'CONNECTION_STATUS',
                     data: { connected, url }
+                });
+            }
+        }
+    }
+
+    // ===== NEW FEATURES MESSAGE HANDLERS =====
+
+    handleKeyboardInput(data) {
+        console.log('[SW] Handling keyboard input:', data);
+        this.injectInputToActivePage({
+            type: 'keyboard',
+            keyData: data
+        });
+    }
+
+    handleMSRSwipe(data) {
+        console.log('[SW] Handling MSR swipe:', data);
+        this.injectInputToActivePage({
+            type: 'msr',
+            track1: data.track1,
+            track2: data.track2,
+            timestamp: data.timestamp
+        });
+    }
+
+    handleNFCTap(data) {
+        console.log('[SW] Handling NFC tap:', data);
+        this.injectInputToActivePage({
+            type: 'nfc',
+            cardData: data,
+            timestamp: Date.now()
+        });
+        
+        // Also broadcast to all connected content scripts for terminal detection
+        this.broadcastToContentScripts({
+            action: 'NFC_PAYMENT',
+            data: data
+        });
+    }
+
+    handleChipInsert(data) {
+        console.log('[SW] Handling chip card insert:', data);
+        this.injectInputToActivePage({
+            type: 'chip_insert',
+            cardData: data,
+            timestamp: data.timestamp
+        });
+        
+        // Broadcast chip insertion event
+        this.broadcastToContentScripts({
+            action: 'CHIP_INSERT',
+            data: data
+        });
+    }
+
+    handleChipRemove(data) {
+        console.log('[SW] Handling chip card remove:', data);
+        this.injectInputToActivePage({
+            type: 'chip_remove',
+            timestamp: data.timestamp
+        });
+        
+        // Broadcast chip removal event
+        this.broadcastToContentScripts({
+            action: 'CHIP_REMOVE',
+            data: data
+        });
+    }
+
+    async handleSendEmail(data) {
+        console.log('[SW] Handling email send request:', data);
+        
+        try {
+            // In a real implementation, this would integrate with an email service
+            // For now, we'll simulate the email functionality
+            
+            // Create a mock response
+            const response = {
+                success: true,
+                messageId: 'msg_' + Date.now(),
+                timestamp: new Date().toISOString()
+            };
+            
+            // Send response back to panel
+            if (this.sidePanelPort) {
+                this.sidePanelPort.postMessage({
+                    type: 'EMAIL_RESPONSE',
+                    data: response
+                });
+            }
+            
+            console.log('[SW] Email simulation completed:', response);
+            
+        } catch (error) {
+            console.error('[SW] Email simulation failed:', error);
+            
+            if (this.sidePanelPort) {
+                this.sidePanelPort.postMessage({
+                    type: 'EMAIL_RESPONSE',
+                    data: {
+                        success: false,
+                        error: error.message
+                    }
                 });
             }
         }
