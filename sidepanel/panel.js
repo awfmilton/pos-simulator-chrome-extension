@@ -46,6 +46,12 @@ class POSSimulatorPanel {
         this.escposParser = new EscPosParser();
         this.lineDisplayParser = new LineDisplayParser();
         this.aamvaGenerator = new AAMVAGenerator();
+        this.creditCardGenerator = new CreditCardGenerator();
+        this.virtualKeyboard = new VirtualKeyboard();
+        this.receiptManager = new ReceiptManager();
+        this.currentCardData = null;
+        this.keyboardMode = 'full';
+        this.stripeInstance = null;
         this.testData = {
             barcodes: {
                 'upc-a': '012345678905',
@@ -234,12 +240,146 @@ class POSSimulatorPanel {
                 aamvaButtons.style.display = 'none';
             }
         });
+
+        // Virtual Keyboard events
+        document.querySelectorAll('input[name="keyboard-mode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                console.log(`[USER-ACTION] Changed keyboard mode to: ${e.target.value}`);
+                this.setKeyboardMode(e.target.value);
+            });
+        });
+
+        document.getElementById('type-text-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Type Text"');
+            this.typeTextFromInput();
+        });
+
+        document.getElementById('keyboard-text-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                console.log('[USER-ACTION] Pressed Enter in keyboard text input');
+                this.typeTextFromInput();
+            }
+        });
+
+        document.getElementById('keyboard-caps-lock').addEventListener('change', (e) => {
+            this.virtualKeyboard.toggleCapsLock();
+            this.updateKeyboardDisplay();
+        });
+
+        document.getElementById('keyboard-num-lock').addEventListener('change', (e) => {
+            this.virtualKeyboard.toggleNumLock();
+            this.updateKeyboardDisplay();
+        });
+
+        document.getElementById('typing-speed').addEventListener('input', (e) => {
+            document.getElementById('typing-speed-value').textContent = e.target.value;
+        });
+
+        // Credit Card Payment Mode events
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const mode = e.currentTarget.dataset.mode;
+                console.log(`[USER-ACTION] Switched to payment mode: ${mode}`);
+                this.switchPaymentMode(mode);
+            });
+        });
+
+        // Credit Card Provider selection
+        document.getElementById('cc-provider').addEventListener('change', (e) => {
+            console.log(`[USER-ACTION] Changed card provider to: ${e.target.value}`);
+            this.updateCardProvider(e.target.value);
+        });
+
+        // Update MSR events to work with new credit card system
+        document.getElementById('swipe-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Swipe Card"');
+            this.handleCardSwipe();
+        });
+
+        document.getElementById('generate-card-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Generate Card"');
+            this.generateCreditCard();
+        });
+
+        // Tap to Pay events
+        document.getElementById('simulate-tap-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Simulate Tap"');
+            this.simulateTapPayment();
+        });
+
+        document.getElementById('nfc-enable-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Enable NFC"');
+            this.toggleNFC();
+        });
+
+        document.getElementById('tap-area').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked tap area');
+            this.simulateTapPayment();
+        });
+
+        // Chip Payment events
+        document.getElementById('insert-chip-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Insert Card"');
+            this.insertChipCard();
+        });
+
+        document.getElementById('remove-chip-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Remove Card"');
+            this.removeChipCard();
+        });
+
+        // Stripe Integration events
+        document.getElementById('stripe-connect-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Connect Stripe"');
+            this.connectStripe();
+        });
+
+        document.getElementById('stripe-payment-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Process Payment"');
+            this.processStripePayment();
+        });
+
+        // Receipt Management events
+        document.getElementById('download-receipt-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Download Receipt"');
+            this.downloadReceipt();
+        });
+
+        document.getElementById('email-receipt-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Email Receipt"');
+            this.emailReceipt();
+        });
+
+        document.getElementById('email-config-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Email Settings"');
+            this.showEmailConfig();
+        });
+
+        // Email Configuration Modal events
+        document.getElementById('close-email-config-btn').addEventListener('click', () => {
+            this.hideEmailConfig();
+        });
+
+        document.getElementById('save-email-config-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Save Email Configuration"');
+            this.saveEmailConfig();
+        });
+
+        document.getElementById('test-email-btn').addEventListener('click', () => {
+            console.log('[USER-ACTION] Clicked "Send Test Email"');
+            this.sendTestEmail();
+        });
+
+        document.getElementById('cancel-email-config-btn').addEventListener('click', () => {
+            this.hideEmailConfig();
+        });
     }
 
 
     initializeUI() {
         this.updateConnectionStatus(false, null);
         this.loadSettings();
+        this.initializeNewFeatures();
     }
 
     connectToServiceWorker() {
@@ -969,6 +1109,547 @@ class POSSimulatorPanel {
             this.applyTheme(theme);
             this.updateThemePreview(theme);
         });
+    }
+
+    // ===== NEW FEATURES METHODS =====
+
+    // Virtual Keyboard Methods
+    setKeyboardMode(mode) {
+        this.keyboardMode = mode;
+        this.virtualKeyboard.setMode(mode);
+        this.renderVirtualKeyboard();
+        this.logActivity('keyboard', `Switched to ${mode} mode`);
+    }
+
+    renderVirtualKeyboard() {
+        const container = document.getElementById('virtual-keyboard');
+        const keyMatrix = this.virtualKeyboard.generateKeyMatrix();
+        
+        container.innerHTML = '';
+        
+        keyMatrix.forEach(row => {
+            const rowElement = document.createElement('div');
+            rowElement.className = 'keyboard-row';
+            
+            row.forEach(keyInfo => {
+                const keyElement = document.createElement('button');
+                keyElement.className = `keyboard-key ${keyInfo.type}`;
+                keyElement.textContent = keyInfo.label;
+                keyElement.style.flex = keyInfo.width > 1 ? keyInfo.width : 'none';
+                
+                keyElement.addEventListener('click', () => {
+                    this.handleVirtualKeyPress(keyInfo.id);
+                });
+                
+                rowElement.appendChild(keyElement);
+            });
+            
+            container.appendChild(rowElement);
+        });
+    }
+
+    handleVirtualKeyPress(keyId) {
+        const success = this.virtualKeyboard.pressKey(keyId);
+        if (success) {
+            this.flashKeyPress(keyId);
+            this.logActivity('keyboard', `Pressed key: ${keyId}`);
+        }
+    }
+
+    flashKeyPress(keyId) {
+        const keyElements = document.querySelectorAll('.keyboard-key');
+        keyElements.forEach(element => {
+            if (element.textContent === this.virtualKeyboard.getKeyLabel(keyId)) {
+                element.classList.add('pressed');
+                setTimeout(() => element.classList.remove('pressed'), 150);
+            }
+        });
+    }
+
+    typeTextFromInput() {
+        const text = document.getElementById('keyboard-text-input').value;
+        if (!text) return;
+        
+        const speed = document.getElementById('typing-speed').value;
+        const delay = Math.max(10, 100 - (speed * 9)); // Convert 1-10 to ~90-10ms delay
+        
+        this.virtualKeyboard.typeString(text, { delay });
+        this.logActivity('keyboard', `Typing text: "${text}" (speed: ${speed})`);
+        
+        // Clear input after typing
+        document.getElementById('keyboard-text-input').value = '';
+    }
+
+    updateKeyboardDisplay() {
+        this.renderVirtualKeyboard();
+    }
+
+    // Credit Card & Payment Methods
+    switchPaymentMode(mode) {
+        // Hide all mode panels
+        document.querySelectorAll('.payment-mode-panel').forEach(panel => {
+            panel.classList.remove('active');
+        });
+        
+        // Show selected mode panel
+        document.getElementById(`${mode}-mode`).classList.add('active');
+        
+        // Update mode buttons
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+        
+        this.logActivity('creditcard', `Switched to ${mode} payment mode`);
+    }
+
+    generateCreditCard() {
+        const provider = document.getElementById('cc-provider').value;
+        this.currentCardData = this.creditCardGenerator.generateCard(provider);
+        
+        this.updateCardDisplay();
+        this.updateTrackData();
+        
+        this.logActivity('creditcard', `Generated ${this.currentCardData.providerName} card: ${this.currentCardData.formattedNumber}`);
+    }
+
+    updateCardDisplay() {
+        if (!this.currentCardData) return;
+        
+        const cardVisual = document.querySelector('.card-visual');
+        cardVisual.querySelector('.card-number').textContent = this.currentCardData.formattedNumber;
+        cardVisual.querySelector('.card-holder').textContent = this.currentCardData.cardholderName;
+        cardVisual.querySelector('.card-expiry').textContent = `${this.currentCardData.expirationMonth}/${this.currentCardData.expirationYear}`;
+        cardVisual.querySelector('.card-cvv').textContent = this.currentCardData.cvv;
+    }
+
+    updateTrackData() {
+        if (!this.currentCardData) return;
+        
+        document.getElementById('track1-input').value = this.currentCardData.track1;
+        document.getElementById('track2-input').value = this.currentCardData.track2;
+    }
+
+    updateCardProvider(provider) {
+        // Auto-generate new card with selected provider
+        this.generateCreditCard();
+    }
+
+    handleCardSwipe() {
+        const track1 = document.getElementById('track1-input').value;
+        const track2 = document.getElementById('track2-input').value;
+        
+        if (!track1 && !track2) {
+            this.updateStatus('No track data to swipe', 'warning');
+            return;
+        }
+        
+        const msrData = {
+            track1: track1 || null,
+            track2: track2 || null,
+            timestamp: Date.now()
+        };
+        
+        this.sendMessage('MSR_SWIPE', msrData);
+        this.logActivity('creditcard', `Card swiped: ${track1 ? 'Track 1' : ''}${track1 && track2 ? ' & ' : ''}${track2 ? 'Track 2' : ''}`);
+        this.updateStatus('Card swiped successfully');
+    }
+
+    // Tap to Pay Methods
+    simulateTapPayment() {
+        const tapArea = document.getElementById('tap-area');
+        const animation = document.getElementById('tap-animation');
+        
+        tapArea.classList.add('active');
+        animation.classList.add('animating');
+        
+        // Play NFC sound if enabled
+        if (document.getElementById('nfc-sounds').checked) {
+            this.playNFCSound();
+        }
+        
+        // Generate NFC data for tap payment
+        const provider = document.getElementById('cc-provider').value;
+        const nfcData = this.creditCardGenerator.generateNFCData(provider);
+        
+        setTimeout(() => {
+            tapArea.classList.remove('active');
+            animation.classList.remove('animating');
+            
+            this.sendMessage('NFC_TAP', nfcData);
+            this.logActivity('creditcard', `NFC tap payment: ${nfcData.formattedNumber}`);
+            this.updateStatus('Tap payment processed');
+        }, 2000);
+    }
+
+    toggleNFC() {
+        const btn = document.getElementById('nfc-enable-btn');
+        const isEnabled = btn.textContent.includes('Disable');
+        
+        if (isEnabled) {
+            btn.textContent = '📡 Enable NFC';
+            btn.classList.remove('primary-btn');
+            btn.classList.add('secondary-btn');
+            this.logActivity('creditcard', 'NFC disabled');
+        } else {
+            btn.textContent = '📡 Disable NFC';
+            btn.classList.remove('secondary-btn');
+            btn.classList.add('primary-btn');
+            this.logActivity('creditcard', 'NFC enabled');
+        }
+    }
+
+    playNFCSound() {
+        // Create a simple beep sound using Web Audio API
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (error) {
+            console.warn('Could not play NFC sound:', error);
+        }
+    }
+
+    // Chip Payment Methods
+    insertChipCard() {
+        const chipCard = document.getElementById('chip-card');
+        const insertBtn = document.getElementById('insert-chip-btn');
+        const removeBtn = document.getElementById('remove-chip-btn');
+        
+        chipCard.style.display = 'block';
+        insertBtn.disabled = true;
+        removeBtn.disabled = false;
+        
+        // Generate chip transaction data
+        if (this.currentCardData) {
+            const chipData = {
+                ...this.currentCardData,
+                interface: 'chip',
+                cryptogram: this.generateCryptogram(),
+                timestamp: Date.now()
+            };
+            
+            this.sendMessage('CHIP_INSERT', chipData);
+            this.logActivity('creditcard', `Chip card inserted: ${this.currentCardData.formattedNumber}`);
+            this.updateStatus('Chip card inserted');
+        }
+    }
+
+    removeChipCard() {
+        const chipCard = document.getElementById('chip-card');
+        const insertBtn = document.getElementById('insert-chip-btn');
+        const removeBtn = document.getElementById('remove-chip-btn');
+        
+        chipCard.style.display = 'none';
+        insertBtn.disabled = false;
+        removeBtn.disabled = true;
+        
+        this.sendMessage('CHIP_REMOVE', { timestamp: Date.now() });
+        this.logActivity('creditcard', 'Chip card removed');
+        this.updateStatus('Chip card removed');
+    }
+
+    generateCryptogram() {
+        // Generate a mock cryptogram for EMV simulation
+        const chars = '0123456789ABCDEF';
+        let result = '';
+        for (let i = 0; i < 16; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    }
+
+    // Stripe Integration Methods
+    async connectStripe() {
+        const publishableKey = document.getElementById('stripe-pk').value;
+        const secretKey = document.getElementById('stripe-sk').value;
+        
+        if (!publishableKey || !secretKey) {
+            this.updateStatus('Please enter both Stripe keys', 'warning');
+            return;
+        }
+        
+        try {
+            // Initialize Stripe (this would need the actual Stripe.js library)
+            this.stripeInstance = {
+                publishableKey,
+                secretKey,
+                connected: true
+            };
+            
+            const statusElement = document.getElementById('stripe-status');
+            statusElement.classList.add('connected');
+            statusElement.querySelector('.status-text').textContent = 'Connected to Stripe';
+            
+            document.getElementById('stripe-payment-btn').disabled = false;
+            
+            this.logActivity('creditcard', 'Connected to Stripe');
+            this.updateStatus('Stripe connected successfully');
+            
+        } catch (error) {
+            console.error('Stripe connection failed:', error);
+            this.updateStatus('Stripe connection failed', 'error');
+        }
+    }
+
+    async processStripePayment() {
+        if (!this.stripeInstance || !this.stripeInstance.connected) {
+            this.updateStatus('Stripe not connected', 'warning');
+            return;
+        }
+        
+        const amount = parseFloat(document.getElementById('stripe-amount').value);
+        if (!amount || amount < 0.50) {
+            this.updateStatus('Amount must be at least $0.50', 'warning');
+            return;
+        }
+        
+        try {
+            // Mock Stripe payment processing
+            const paymentData = {
+                amount: Math.round(amount * 100), // Convert to cents
+                currency: 'usd',
+                payment_method: 'card',
+                card: this.currentCardData,
+                timestamp: Date.now()
+            };
+            
+            // Simulate processing delay
+            this.updateStatus('Processing payment...');
+            
+            setTimeout(() => {
+                const success = Math.random() > 0.1; // 90% success rate for testing
+                
+                if (success) {
+                    const transactionId = 'txn_' + Date.now();
+                    this.logActivity('creditcard', `Stripe payment processed: $${amount.toFixed(2)} - ${transactionId}`);
+                    this.updateStatus(`Payment successful: ${transactionId}`);
+                } else {
+                    this.logActivity('creditcard', `Stripe payment failed: $${amount.toFixed(2)}`);
+                    this.updateStatus('Payment declined', 'error');
+                }
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Stripe payment failed:', error);
+            this.updateStatus('Payment processing failed', 'error');
+        }
+    }
+
+    // Receipt Management Methods
+    async downloadReceipt() {
+        try {
+            const format = document.getElementById('receipt-format').value;
+            const receiptData = this.getCurrentReceiptData();
+            
+            if (!receiptData) {
+                this.updateStatus('No receipt data available', 'warning');
+                return;
+            }
+            
+            if (format === 'pdf' || format === 'both') {
+                const pdfReceipt = await this.receiptManager.generatePDF(receiptData);
+                await this.receiptManager.downloadReceipt(pdfReceipt);
+            }
+            
+            if (format === 'text' || format === 'both') {
+                const textReceipt = this.receiptManager.generateTextReceipt(receiptData);
+                await this.receiptManager.downloadReceipt(textReceipt);
+            }
+            
+            this.updateReceiptHistory();
+            this.logActivity('printer', `Receipt downloaded as ${format}`);
+            this.updateStatus('Receipt downloaded successfully');
+            
+        } catch (error) {
+            console.error('Download failed:', error);
+            this.updateStatus('Download failed', 'error');
+        }
+    }
+
+    async emailReceipt() {
+        try {
+            const email = document.getElementById('receipt-email').value || 'alex@tbay.tk';
+            const format = document.getElementById('receipt-format').value;
+            const receiptData = this.getCurrentReceiptData();
+            
+            if (!receiptData) {
+                this.updateStatus('No receipt data available', 'warning');
+                return;
+            }
+            
+            let receiptRecord;
+            if (format === 'pdf') {
+                receiptRecord = await this.receiptManager.generatePDF(receiptData);
+            } else {
+                receiptRecord = this.receiptManager.generateTextReceipt(receiptData);
+            }
+            
+            await this.receiptManager.emailReceipt(receiptRecord, email);
+            
+            this.updateReceiptHistory();
+            this.logActivity('printer', `Receipt emailed to ${email}`);
+            this.updateStatus('Receipt emailed successfully');
+            
+        } catch (error) {
+            console.error('Email failed:', error);
+            this.updateStatus('Email failed: ' + error.message, 'error');
+        }
+    }
+
+    getCurrentReceiptData() {
+        // Extract receipt data from the current receipt display
+        const receiptContent = document.querySelector('.receipt-content');
+        if (!receiptContent) return null;
+        
+        const lines = Array.from(receiptContent.querySelectorAll('.receipt-line'))
+            .map(line => line.textContent);
+        
+        return {
+            storeName: 'POS Simulator Store',
+            storeAddress: '123 Test Street, Test City, TS 12345',
+            storePhone: '(555) 123-4567',
+            items: this.extractItemsFromReceipt(lines),
+            total: this.extractTotalFromReceipt(lines),
+            receiptNumber: this.receiptManager.generateReceiptNumber(),
+            cashier: 'Simulator User'
+        };
+    }
+
+    extractItemsFromReceipt(lines) {
+        const items = [];
+        // Simple extraction logic - this would be more sophisticated in practice
+        for (const line of lines) {
+            if (line.includes('$') && !line.includes('Total') && !line.includes('Tax')) {
+                const match = line.match(/(.+)\s+\$?([\d.]+)/);
+                if (match) {
+                    items.push({
+                        name: match[1].trim(),
+                        price: parseFloat(match[2]) || 0,
+                        quantity: 1
+                    });
+                }
+            }
+        }
+        return items;
+    }
+
+    extractTotalFromReceipt(lines) {
+        for (const line of lines) {
+            if (line.toLowerCase().includes('total')) {
+                const match = line.match(/\$?([\d.]+)/);
+                if (match) {
+                    return parseFloat(match[1]) || 0;
+                }
+            }
+        }
+        return 0;
+    }
+
+    updateReceiptHistory() {
+        const historyList = document.getElementById('receipt-history-list');
+        const history = this.receiptManager.getReceiptHistory();
+        
+        if (history.length === 0) {
+            historyList.innerHTML = '<div class="history-item">No receipts generated yet</div>';
+            return;
+        }
+        
+        historyList.innerHTML = history.slice(-5).reverse().map(receipt => `
+            <div class="history-item">
+                <div class="item-info">
+                    <div>Receipt ${receipt.id}</div>
+                    <div class="item-date">${new Date(receipt.timestamp).toLocaleString()}</div>
+                </div>
+                <div class="item-actions">
+                    <span class="item-format">${receipt.format.toUpperCase()}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Email Configuration Methods
+    showEmailConfig() {
+        document.getElementById('email-config-modal').style.display = 'flex';
+    }
+
+    hideEmailConfig() {
+        document.getElementById('email-config-modal').style.display = 'none';
+    }
+
+    async saveEmailConfig() {
+        const config = {
+            smtpServer: document.getElementById('smtp-server').value,
+            smtpPort: parseInt(document.getElementById('smtp-port').value),
+            email: document.getElementById('smtp-email').value,
+            password: document.getElementById('smtp-password').value,
+            secure: document.getElementById('smtp-secure').checked
+        };
+        
+        if (!config.smtpServer || !config.email || !config.password) {
+            this.updateStatus('Please fill in all required fields', 'warning');
+            return;
+        }
+        
+        try {
+            this.receiptManager.configureEmail(config);
+            this.updateStatus('Email configuration saved');
+            this.hideEmailConfig();
+            this.logActivity('printer', 'Email configuration updated');
+        } catch (error) {
+            console.error('Failed to save email config:', error);
+            this.updateStatus('Failed to save email configuration', 'error');
+        }
+    }
+
+    async sendTestEmail() {
+        try {
+            const testReceipt = this.receiptManager.generateTextReceipt({
+                storeName: 'Test Store',
+                items: [{ name: 'Test Item', price: 1.00, quantity: 1 }],
+                total: 1.00
+            });
+            
+            const testEmail = document.getElementById('smtp-email').value;
+            await this.receiptManager.emailReceipt(testReceipt, testEmail, {
+                subject: 'Test Email from POS Simulator',
+                customBody: 'This is a test email to verify your email configuration is working correctly.'
+            });
+            
+            this.updateStatus('Test email sent successfully');
+        } catch (error) {
+            console.error('Test email failed:', error);
+            this.updateStatus('Test email failed: ' + error.message, 'error');
+        }
+    }
+
+    // Initialize new features
+    initializeNewFeatures() {
+        // Set default email
+        document.getElementById('receipt-email').value = 'alex@tbay.tk';
+        
+        // Initialize virtual keyboard
+        this.renderVirtualKeyboard();
+        
+        // Generate initial credit card
+        setTimeout(() => {
+            this.generateCreditCard();
+        }, 100);
+        
+        // Update receipt history
+        this.updateReceiptHistory();
     }
 }
 
