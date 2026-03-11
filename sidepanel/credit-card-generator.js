@@ -134,11 +134,11 @@ class CreditCardGenerator {
 
     // Calculate Luhn algorithm checksum
     calculateLuhnChecksum(cardNumber) {
-        const digits = cardNumber.split('').map(Number).reverse();
         let sum = 0;
+        let shouldDouble = true;
 
-        for (let i = 0; i < digits.length; i++) {
-            let digit = digits[i];
+        for (let i = cardNumber.length - 1; i >= 0; i--) {
+            let digit = Number(cardNumber[i]);
             
             // When calculating checksum for a number that will have one more digit appended,
             // the current index i will become i+1 in the final number.
@@ -151,6 +151,7 @@ class CreditCardGenerator {
             }
             
             sum += digit;
+            shouldDouble = !shouldDouble;
         }
 
         return (10 - (sum % 10)) % 10;
@@ -162,11 +163,11 @@ class CreditCardGenerator {
             return false;
         }
 
-        const digits = cardNumber.split('').map(Number).reverse();
         let sum = 0;
+        let shouldDouble = false;
 
-        for (let i = 0; i < digits.length; i++) {
-            let digit = digits[i];
+        for (let i = cardNumber.length - 1; i >= 0; i--) {
+            let digit = Number(cardNumber[i]);
             
             // Double every second digit from the right (indices 1, 3, 5...)
             if (i % 2 === 1) {
@@ -177,6 +178,7 @@ class CreditCardGenerator {
             }
             
             sum += digit;
+            shouldDouble = !shouldDouble;
         }
 
         return sum % 10 === 0;
