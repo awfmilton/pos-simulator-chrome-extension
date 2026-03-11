@@ -8,43 +8,12 @@ License: personal use $5/month, business use $100/month
 // POS Peripheral Simulator - Panel JavaScript
 // Handles UI interactions and communication with service worker
 
-class LineDisplayParser {
-    constructor() {
-        this.currentLine1 = '';
-        this.currentLine2 = '';
-    }
-
-    parseCommand(data) {
-        // Common line display commands
-        const hex = Array.from(data).map(b => b.toString(16).padStart(2, '0')).join('');
-
-        if (hex.startsWith('0c')) { // Clear screen
-            this.currentLine1 = '';
-            this.currentLine2 = '';
-            return { command: 'clear' };
-        }
-
-        if (hex.startsWith('1b4c')) { // Position cursor
-            return { command: 'position' };
-        }
-
-        // Extract text content
-        const text = new TextDecoder().decode(data);
-        if (text.length > 0 && text.charCodeAt(0) >= 32) {
-            return { command: 'text', data: text };
-        }
-
-        return { command: 'unknown', hex };
-    }
-}
-
 class POSSimulatorPanel {
     constructor() {
         this.currentTab = 'scanner';
         this.peripheralStates = {};
         this.keepAliveInterval = null;
         this.escposParser = new EscPosParser();
-        this.lineDisplayParser = new LineDisplayParser();
         this.aamvaGenerator = new AAMVAGenerator();
         this.creditCardGenerator = new CreditCardGenerator();
         this.virtualKeyboard = new VirtualKeyboard();
