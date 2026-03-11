@@ -1,0 +1,11 @@
+{
+  "name": "pos-peripheral-simulator",
+  "version": "2.1.0",
+  "description": "Virtual POS Peripheral Simulator",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
