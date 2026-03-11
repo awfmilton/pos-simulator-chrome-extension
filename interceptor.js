@@ -244,7 +244,7 @@ function createUSBPrinterDevice(brand, model, config) {
         productId: config.productId,
         productName: config.name,
         manufacturerName: brand.toUpperCase(),
-        serialNumber: `SIM${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+        serialNumber: `SIM-${self.crypto.randomUUID().toUpperCase()}`,
         opened: false,
         configurations: [{
             configurationValue: 1,
@@ -866,7 +866,7 @@ const bluetoothPrinterServices = {
 
 function createBluetoothPrinterDevice(brand, model) {
     const device = {
-        id: `bt_${brand}_${model}_${Math.random().toString(36).substr(2, 6)}`,
+        id: `bt_${brand}_${model}_${self.crypto.randomUUID()}`,
         name: `${brand.toUpperCase()} ${model}`,
         gatt: null
     };
@@ -1041,7 +1041,7 @@ window.fetch = async function(resource, config = {}) {
         const responseData = JSON.stringify({
             status: 'success',
             message: 'Print job accepted',
-            jobId: Math.random().toString(36).substr(2, 8)
+            jobId: self.crypto.randomUUID()
         });
 
         return Promise.resolve(new Response(responseData, {
