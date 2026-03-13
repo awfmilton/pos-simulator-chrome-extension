@@ -63,7 +63,7 @@ class POSContentScript {
 
     setupWindowListener() {
         window.addEventListener('message', (event) => {
-            if (event.source !== window || !event.data.type) {
+            if (!event.data || !event.data.type) {
                 return;
             }
 
