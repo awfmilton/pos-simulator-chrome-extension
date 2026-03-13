@@ -991,7 +991,15 @@ const networkProtocols = {
 // Enhanced fetch interception for network printers
 const originalFetch = window.fetch;
 window.fetch = async function(resource, config = {}) {
-    const url = resource instanceof Request ? resource.url : resource;
+    let url = '';
+    let requestObj = null;
+
+    if (resource instanceof Request) {
+        url = resource.url;
+        requestObj = resource;
+    } else {
+        url = resource;
+    }
 
     // Check if this is a printer-related network call
     const isPrinterCall = networkPrinterEndpoints.some(endpoint => url.includes(endpoint));
@@ -1003,26 +1011,50 @@ window.fetch = async function(resource, config = {}) {
         let payload = '';
         let contentType = 'application/octet-stream';
 
-        if (config.body) {
-            if (typeof config.body === 'string') {
-                payload = config.body;
-                contentType = config.headers?.['Content-Type'] || 'text/plain';
-            } else if (config.body instanceof ArrayBuffer) {
-                payload = Array.from(new Uint8Array(config.body));
-                contentType = 'application/octet-stream';
-            } else if (config.body instanceof Uint8Array) {
-                payload = Array.from(config.body);
-                contentType = 'application/octet-stream';
+        const getHeader = (name) => {
+            const lowerName = name.toLowerCase();
+            if (requestObj && requestObj.headers) {
+                return requestObj.headers.get(name);
+            }
+            if (config.headers) {
+                if (typeof config.headers.get === 'function') {
+                    return config.headers.get(name);
+                }
+                const key = Object.keys(config.headers).find(k => k.toLowerCase() === lowerName);
+                return key ? config.headers[key] : null;
+            }
+            return null;
+        };
+
+        let bodyData = requestObj ? await requestObj.clone().arrayBuffer() : config.body;
+
+        if (bodyData) {
+            if (typeof bodyData === 'string') {
+                payload = bodyData;
+                contentType = getHeader('Content-Type') || 'text/plain';
+            } else if (bodyData instanceof ArrayBuffer || ArrayBuffer.isView(bodyData)) {
+                payload = bufferSourceToByteArray(bodyData);
+                contentType = getHeader('Content-Type') || 'application/octet-stream';
             } else {
-                payload = await new Response(config.body).text();
+                try {
+                    payload = await new Response(bodyData).text();
+                    contentType = getHeader('Content-Type') || 'text/plain';
+                } catch(e) {
+                    payload = '';
+                }
             }
         }
 
         // Determine printer brand from URL or headers
         let brand = 'epson'; // default
-        if (url.includes('star') || config.headers?.['User-Agent']?.includes('Star')) {
+        const xBrand = getHeader('X-Printer-Brand');
+        const userAgent = getHeader('User-Agent');
+
+        if (xBrand) {
+            brand = xBrand.toLowerCase();
+        } else if (url.includes('star') || (userAgent && userAgent.toLowerCase().includes('star'))) {
             brand = 'star';
-        } else if (url.includes('citizen') || config.headers?.['User-Agent']?.includes('Citizen')) {
+        } else if (url.includes('citizen') || (userAgent && userAgent.toLowerCase().includes('citizen'))) {
             brand = 'citizen';
         }
 

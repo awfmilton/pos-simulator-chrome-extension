@@ -449,7 +449,12 @@ class POSSimulatorPanel {
         }
 
         // Add the new data chunk to the buffer.
-        this.printDataBuffer.push(new Uint8Array(data));
+        if (typeof data === 'string') {
+            const encoder = new TextEncoder();
+            this.printDataBuffer.push(encoder.encode(data));
+        } else {
+            this.printDataBuffer.push(new Uint8Array(data));
+        }
         this.lastPrintInfo = { deviceType, brand };
 
         // Set a timer to process the buffer after a short delay.
@@ -482,7 +487,7 @@ class POSSimulatorPanel {
             console.log('[PRINT-BUFFER] Successfully parsed buffered data:', parsedData);
 
             // Check for drawer kick commands
-            const drawerCommands = parsedData.commands.filter(cmd => cmd.name === 'drawer_kick');
+            const drawerCommands = parsedData.commands.filter(cmd => cmd.type === 'drawer_kick');
             if (drawerCommands.length > 0) {
                 console.log(`[PRINT-BUFFER] Found ${drawerCommands.length} drawer kick command(s) in buffered data!`);
                 this.handleDrawerKickFromPrinter(drawerCommands.length, brand);
