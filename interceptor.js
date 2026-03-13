@@ -12,7 +12,7 @@ License: personal use $5/month, business use $100/month
     console.log('[interceptor.js] Running in main world.');
 
     window.addEventListener('message', (event) => {
-        if (event.source !== window || !event.data.type) {
+        if (!event.data || !event.data.type) {
             return;
         }
 
@@ -28,6 +28,9 @@ License: personal use $5/month, business use $100/month
     function bufferSourceToByteArray(source) {
         if (source instanceof ArrayBuffer) {
             return Array.from(new Uint8Array(source));
+        }
+        if (typeof source === 'object' && source !== null && typeof source.length === 'number') {
+            return Array.from(source);
         }
         if (ArrayBuffer.isView(source)) {
             return Array.from(new Uint8Array(source.buffer, source.byteOffset, source.byteLength));
@@ -1032,7 +1035,7 @@ window.fetch = async function(resource, config = {}) {
             if (typeof bodyData === 'string') {
                 payload = bodyData;
                 contentType = getHeader('Content-Type') || 'text/plain';
-            } else if (bodyData instanceof ArrayBuffer || ArrayBuffer.isView(bodyData)) {
+            } else if (bodyData instanceof ArrayBuffer || ArrayBuffer.isView(bodyData) || typeof bodyData.length === 'number' || typeof bodyData.byteLength === 'number') {
                 payload = bufferSourceToByteArray(bodyData);
                 contentType = getHeader('Content-Type') || 'application/octet-stream';
             } else {

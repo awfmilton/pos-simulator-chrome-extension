@@ -487,7 +487,7 @@ class POSSimulatorPanel {
             console.log('[PRINT-BUFFER] Successfully parsed buffered data:', parsedData);
 
             // Check for drawer kick commands
-            const drawerCommands = parsedData.commands.filter(cmd => cmd.type === 'drawer_kick');
+            const drawerCommands = parsedData.commands.filter(cmd => cmd.name === 'drawer_kick' || cmd.type === 'drawer_kick');
             if (drawerCommands.length > 0) {
                 console.log(`[PRINT-BUFFER] Found ${drawerCommands.length} drawer kick command(s) in buffered data!`);
                 this.handleDrawerKickFromPrinter(drawerCommands.length, brand);
