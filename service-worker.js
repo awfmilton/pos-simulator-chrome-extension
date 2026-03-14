@@ -281,10 +281,20 @@ class PeripheralSimulatorService {
         }
 
         try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            // Check if the tab URL matches AND if we have an active connection from its content script
-            if (tab && tab.url.match(new RegExp(this.posUrlPattern.replace('*', '.*'))) && this.contentScriptPorts.has(tab.id)) {
-                this.updateConnectionStatus(true, tab.url);
+            // Find all tabs to see if any matches the POS URL and is connected
+            const tabs = await chrome.tabs.query({});
+            let connectedTab = null;
+
+            for (const tab of tabs) {
+                // Check if the tab URL matches AND if we have an active connection from its content script
+                if (tab.url && tab.url.match(new RegExp(this.posUrlPattern.replace('*', '.*'))) && this.contentScriptPorts.has(tab.id)) {
+                    connectedTab = tab;
+                    break;
+                }
+            }
+
+            if (connectedTab) {
+                this.updateConnectionStatus(true, connectedTab.url);
             } else {
                 this.updateConnectionStatus(false, null);
             }
