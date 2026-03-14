@@ -63,25 +63,29 @@ class POSContentScript {
 
     setupWindowListener() {
         window.addEventListener('message', (event) => {
-            if (!event.data || !event.data.type) {
-                return;
+            // 1. Security check: Only accept messages from our own window
+            if (event.source !== window || !event.data) return;
+
+            // 2. Explicit Router: Forward POS Network Intercepts perfectly
+            if (event.data.type === 'NETWORK_INTERCEPT') {
+                chrome.runtime.sendMessage(event.data).catch(() => {});
+                return; // STOP execution so we don't hit the fallback
             }
 
-            if (event.data.type === 'POS_SIMULATOR_RAW_DATA') {
-                if (this.port) {
-                    try {
-                        this.port.postMessage({
-                            ...event.data,
-                            type: 'RAW_DATA_FROM_PAGE'
-                        });
-                    } catch (error) {
-                        console.error('[CS] Error posting message to service worker port:', error);
-                    }
-                } else {
-                    console.warn('[CS] Port not connected. Cannot send message:', event.data);
-                }
+            // 3. Explicit Router: Forward direct Hardware Commands
+            if (event.data.type === 'HARDWARE_COMMAND') {
+                chrome.runtime.sendMessage(event.data).catch(() => {});
+                return; // STOP execution
             }
-        }, false);
+
+            // 4. Fallback: Only append RAW_DATA_FROM_PAGE if NO type exists
+            if (event.data.payload && !event.data.type) {
+                chrome.runtime.sendMessage({
+                    type: 'RAW_DATA_FROM_PAGE',
+                    ...event.data
+                }).catch(() => {});
+            }
+        });
     }
 
     trackFocusedElements() {
