@@ -61,29 +61,22 @@ class POSContentScript {
         });
     }
 
-    setupWindowListener() {
+setupWindowListener() {
         window.addEventListener('message', (event) => {
-            // 1. Security check: Only accept messages from our own window
-            if (event.source !== window || !event.data) return;
+            // 1. Security check: Only accept valid typed messages from our own window
+            if (event.source !== window || !event.data || !event.data.type) return;
 
-            // 2. Explicit Router: Forward POS Network Intercepts perfectly
-            if (event.data.type === 'NETWORK_INTERCEPT') {
-                chrome.runtime.sendMessage(event.data).catch(() => {});
-                return; // STOP execution so we don't hit the fallback
-            }
+            const t = event.data.type;
 
-            // 3. Explicit Router: Forward direct Hardware Commands
-            if (event.data.type === 'HARDWARE_COMMAND') {
-                chrome.runtime.sendMessage(event.data).catch(() => {});
-                return; // STOP execution
-            }
-
-            // 4. Fallback: Only append RAW_DATA_FROM_PAGE if NO type exists
-            if (event.data.payload && !event.data.type) {
-                chrome.runtime.sendMessage({
-                    type: 'RAW_DATA_FROM_PAGE',
-                    ...event.data
-                }).catch(() => {});
+            // 2. Master Router: Whitelist all valid Simulator/Hardware event types
+            if (t.startsWith('POS_SIMULATOR') || 
+                t === 'NETWORK_INTERCEPT' || 
+                t === 'HARDWARE_COMMAND') {
+                
+                // Pipe the exact payload directly via the long-lived port!
+                if (this.port) {
+                    this.port.postMessage(event.data);
+                }
             }
         });
     }
