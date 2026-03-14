@@ -63,17 +63,20 @@ class POSContentScript {
 
     setupWindowListener() {
         window.addEventListener('message', (event) => {
-            if (!event.data || !event.data.type) {
-                return;
-            }
+            // 1. Security check: Only accept valid typed messages from our own window
+            if (event.source !== window || !event.data || !event.data.type) return;
 
-            if (event.data.type === 'POS_SIMULATOR_RAW_DATA') {
+            const t = event.data.type;
+
+            // 2. Master Router: Whitelist all valid Simulator/Hardware event types
+            if (t.startsWith('POS_SIMULATOR') ||
+                t === 'NETWORK_INTERCEPT' ||
+                t === 'HARDWARE_COMMAND') {
+
+                // Pipe the exact payload directly via the long-lived port!
                 if (this.port) {
                     try {
-                        this.port.postMessage({
-                            ...event.data,
-                            type: 'RAW_DATA_FROM_PAGE'
-                        });
+                        this.port.postMessage(event.data);
                     } catch (error) {
                         console.error('[CS] Error posting message to service worker port:', error);
                     }
@@ -81,7 +84,7 @@ class POSContentScript {
                     console.warn('[CS] Port not connected. Cannot send message:', event.data);
                 }
             }
-        }, false);
+        });
     }
 
     trackFocusedElements() {
