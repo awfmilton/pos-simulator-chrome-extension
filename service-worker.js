@@ -59,9 +59,15 @@ class PeripheralSimulatorService {
         console.log(`[SW] Content script from tab ${tabId} connected.`);
         this.contentScriptPorts.set(tabId, port);
 
-        port.onMessage.addListener((msg) => {
-            if (msg.type === 'RAW_DATA_FROM_PAGE') {
-                this.handleRawData(msg);
+        port.onMessage.addListener(async (msg) => {
+            // CRITICAL FIX: Accept native simulator types
+            if (msg.type === 'POS_SIMULATOR_RAW_DATA' || msg.type === 'RAW_DATA_FROM_PAGE') {
+                if (this.sidePanelPort) {
+                    this.sidePanelPort.postMessage({
+                        type: 'RAW_DATA', // The Panel listens for RAW_DATA
+                        data: msg
+                    });
+                }
             }
         });
 

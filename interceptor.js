@@ -249,6 +249,14 @@ function createUSBPrinterDevice(brand, model, config) {
         manufacturerName: brand.toUpperCase(),
         serialNumber: `SIM-${self.crypto.randomUUID().toUpperCase()}`,
         opened: false,
+        // CRITICAL FIX: Add mocked configuration object
+        configuration: {
+            interfaces: [{
+                alternate: {
+                    endpoints: [{ direction: 'out', endpointNumber: 1 }]
+                }
+            }]
+        },
         configurations: [{
             configurationValue: 1,
             interfaces: [{
@@ -1031,45 +1039,13 @@ window.fetch = async function(resource, config = {}) {
 
         let bodyData = requestObj ? await requestObj.clone().arrayBuffer() : config.body;
 
-        if (bodyData) {
-            if (typeof bodyData === 'string') {
-                payload = bodyData;
-                contentType = getHeader('Content-Type') || 'text/plain';
-            } else if (bodyData instanceof ArrayBuffer || ArrayBuffer.isView(bodyData) || typeof bodyData.length === 'number' || typeof bodyData.byteLength === 'number') {
-                payload = bufferSourceToByteArray(bodyData);
-                contentType = getHeader('Content-Type') || 'application/octet-stream';
-            } else {
-                try {
-                    payload = await new Response(bodyData).text();
-                    contentType = getHeader('Content-Type') || 'text/plain';
-                } catch(e) {
-                    payload = '';
-                }
-            }
-        }
-
-        // Determine printer brand from URL or headers
-        let brand = 'epson'; // default
-        const xBrand = getHeader('X-Printer-Brand');
-        const userAgent = getHeader('User-Agent');
-
-        if (xBrand) {
-            brand = xBrand.toLowerCase();
-        } else if (url.includes('star') || (userAgent && userAgent.toLowerCase().includes('star'))) {
-            brand = 'star';
-        } else if (url.includes('citizen') || (userAgent && userAgent.toLowerCase().includes('citizen'))) {
-            brand = 'citizen';
-        }
-
+        // Broadcast print job to extension
         window.postMessage({
             type: 'POS_SIMULATOR_RAW_DATA',
             source: 'network',
-            deviceType: 'printer',
-            brand: brand,
-            payload: payload,
-            contentType: contentType,
-            connectionType: 'network',
-            endpoint: url
+            // CRITICAL FIX: Convert Uint8Array to standard Array for MV3 port transport
+            payload: bufferSourceToByteArray(config.body),
+            contentType: typeof config.body === 'string' ? 'text/xml' : 'application/octet-stream'
         }, '*');
 
         // Return appropriate success response
@@ -1099,7 +1075,7 @@ window.fetch = async function(resource, config = {}) {
                 source: 'network',
                 deviceType: 'cash-drawer',
                 command: 'open',
-                payload: config.body ? Array.from(new TextEncoder().encode(config.body)) : []
+                payload: config.body ? bufferSourceToByteArray(config.body) : []
             }, '*');
 
             return Promise.resolve(new Response('{"status":"ok","drawer":"opened"}', {
