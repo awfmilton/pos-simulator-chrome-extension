@@ -71,8 +71,8 @@ class POSContentScript {
                 if (this.port) {
                     try {
                         this.port.postMessage({
-                            type: 'RAW_DATA_FROM_PAGE',
-                            ...event.data
+                            ...event.data,
+                            type: 'RAW_DATA_FROM_PAGE'
                         });
                     } catch (error) {
                         console.error('[CS] Error posting message to service worker port:', error);

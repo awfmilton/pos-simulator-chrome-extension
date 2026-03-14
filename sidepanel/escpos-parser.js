@@ -53,6 +53,12 @@ class EscPosParser {
                 continue;
             }
 
+            if (byte === 0x07 && brand === 'star') {
+                flushBuffer();
+                receipt.lines.push({ type: 'command', name: 'drawer_kick', brand: 'star' });
+                continue;
+            }
+
             if (byte === this.ESC) {
                 flushBuffer(); // Process text before command
                 const commandCode = data[++i]; // Move to next byte for command code
@@ -87,6 +93,24 @@ class EscPosParser {
                         });
                         i += 3; // Consume the 3 parameters
                         break;
+                    case 0x64: // ESC d (Print and feed n lines / Star Cut)
+                        const feedLines = data[++i];
+                        if (brand === 'star') {
+                            receipt.lines.push({ type: 'command', name: 'cut', value: 'Full Cut', brand: 'star' });
+                        }
+                        break;
+                    case 0x1D: // ESC GS a (Star Alignment)
+                        if (brand === 'star' && data[i+1] === 0x61) {
+                            i++; // Consume 0x61
+                            const alignValue = data[++i];
+                            if (alignValue === 0) state.align = 'left';
+                            else if (alignValue === 1) state.align = 'center';
+                            else if (alignValue === 2) state.align = 'right';
+                        } else {
+                            // Fallback skip 1 byte
+                            if (i + 1 < data.length) i++;
+                        }
+                        break;
                     default:
                          console.warn(`[Parser] Skipping unknown ESC command: 0x${commandCode.toString(16)}`);
                          // We assume a 1-byte parameter for unknown commands to avoid getting stuck
@@ -100,6 +124,10 @@ class EscPosParser {
                 if (commandCode === 0x56) { // GS V (Cut)
                     const cutType = data[++i];
                     receipt.lines.push(this.decodeCutCommand(cutType, brand));
+                    // Mode A or B (65, 66) has an extra parameter for paper feed length
+                    if (cutType === 65 || cutType === 66 || cutType === 0x41 || cutType === 0x42) {
+                        i++;
+                    }
                 } else if (commandCode === 0x6B) { // GS k (Barcode)
                     const barcodeType = data[++i];
                     const barcodeData = [];
