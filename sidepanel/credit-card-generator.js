@@ -140,10 +140,7 @@ class CreditCardGenerator {
         for (let i = cardNumber.length - 1; i >= 0; i--) {
             let digit = Number(cardNumber[i]);
             
-            // When calculating checksum for a number that will have one more digit appended,
-            // the current index i will become i+1 in the final number.
-            // Luhn doubles digits at odd positions (1, 3, 5...) from the right.
-            if (i % 2 === 0) {
+            if (shouldDouble) {
                 digit *= 2;
                 if (digit > 9) {
                     digit -= 9;
@@ -169,8 +166,7 @@ class CreditCardGenerator {
         for (let i = cardNumber.length - 1; i >= 0; i--) {
             let digit = Number(cardNumber[i]);
             
-            // Double every second digit from the right (indices 1, 3, 5...)
-            if (i % 2 === 1) {
+            if (shouldDouble) {
                 digit *= 2;
                 if (digit > 9) {
                     digit -= 9;

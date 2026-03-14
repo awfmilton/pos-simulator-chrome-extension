@@ -61,24 +61,18 @@ class POSContentScript {
         });
     }
 
-setupWindowListener() {
+    setupWindowListener() {
         window.addEventListener('message', (event) => {
-            // 1. Security check: Only accept valid typed messages from our own window
-            if (event.source !== window || !event.data || !event.data.type) return;
+            if (!event.data || !event.data.type) return;
 
             const t = event.data.type;
-
-            // 2. Master Router: Whitelist all valid Simulator/Hardware event types
-            if (t.startsWith('POS_SIMULATOR') || 
-                t === 'NETWORK_INTERCEPT' || 
-                t === 'HARDWARE_COMMAND') {
-                
-                // Pipe the exact payload directly via the long-lived port!
+            // Route simulator events perfectly without mutating them
+            if (t.startsWith('POS_SIMULATOR') || t === 'NETWORK_INTERCEPT' || t === 'HARDWARE_COMMAND') {
                 if (this.port) {
                     this.port.postMessage(event.data);
                 }
             }
-        });
+        }, false);
     }
 
     trackFocusedElements() {
