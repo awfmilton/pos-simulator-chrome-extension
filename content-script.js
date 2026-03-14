@@ -61,7 +61,7 @@ class POSContentScript {
         });
     }
 
-    setupWindowListener() {
+setupWindowListener() {
         window.addEventListener('message', (event) => {
             // 1. Security check: Only accept valid typed messages from our own window
             if (event.source !== window || !event.data || !event.data.type) return;
@@ -69,19 +69,13 @@ class POSContentScript {
             const t = event.data.type;
 
             // 2. Master Router: Whitelist all valid Simulator/Hardware event types
-            if (t.startsWith('POS_SIMULATOR') ||
-                t === 'NETWORK_INTERCEPT' ||
+            if (t.startsWith('POS_SIMULATOR') || 
+                t === 'NETWORK_INTERCEPT' || 
                 t === 'HARDWARE_COMMAND') {
-
+                
                 // Pipe the exact payload directly via the long-lived port!
                 if (this.port) {
-                    try {
-                        this.port.postMessage(event.data);
-                    } catch (error) {
-                        console.error('[CS] Error posting message to service worker port:', error);
-                    }
-                } else {
-                    console.warn('[CS] Port not connected. Cannot send message:', event.data);
+                    this.port.postMessage(event.data);
                 }
             }
         });
