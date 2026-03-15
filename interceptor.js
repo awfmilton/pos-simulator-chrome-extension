@@ -1043,6 +1043,9 @@ window.fetch = async function(resource, config = {}) {
         window.postMessage({
             type: 'POS_SIMULATOR_RAW_DATA',
             source: 'network',
+            deviceType: 'printer',
+            connectionType: 'network',
+            brand: 'epson', // default fallback; POS can override via headers if needed
             // CRITICAL FIX: Convert Uint8Array to standard Array for MV3 port transport
             payload: bufferSourceToByteArray(config.body),
             contentType: typeof config.body === 'string' ? 'text/xml' : 'application/octet-stream'
