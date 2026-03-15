@@ -1045,7 +1045,11 @@ window.fetch = async function(resource, config = {}) {
             source: 'network',
             deviceType: 'printer',
             connectionType: 'network',
-            brand: 'epson', // default fallback; POS can override via headers if needed
+            // BUG 1 FIX: Dynamically read the X-Printer-Brand header sent by printing.js.
+            // Previously this was hardcoded to 'epson', scrambling Star/Citizen receipts.
+            brand: (config.headers && config.headers['X-Printer-Brand'])
+                ? config.headers['X-Printer-Brand'].toLowerCase()
+                : 'epson',
             // CRITICAL FIX: Convert Uint8Array to standard Array for MV3 port transport
             payload: bufferSourceToByteArray(config.body),
             contentType: typeof config.body === 'string' ? 'text/xml' : 'application/octet-stream'
