@@ -304,7 +304,6 @@ function createUSBPrinterDevice(brand, model, config) {
                 type: 'POS_SIMULATOR_RAW_DATA',
                 source: 'webusb',
                 deviceType: 'printer',
-                brand: brand,
                 model: model,
                 payload: payloadArray,
                 connectionType: 'usb'
@@ -619,7 +618,6 @@ function createSerialPrinterPort(brand, model, config) {
                         type: 'POS_SIMULATOR_RAW_DATA',
                         source: 'webserial',
                         deviceType: 'printer',
-                        brand: brand,
                         model: model,
                         payload: payloadArray,
                         connectionType: 'serial'
@@ -899,7 +897,6 @@ function createBluetoothPrinterDevice(brand, model) {
                 type: 'POS_SIMULATOR_RAW_DATA',
                 source: 'webbluetooth',
                 deviceType: 'printer',
-                brand: brand,
                 model: model,
                 payload: payloadArray,
                 connectionType: 'bluetooth'
