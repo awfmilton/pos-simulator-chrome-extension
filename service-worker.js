@@ -60,14 +60,15 @@ class PeripheralSimulatorService {
         this.contentScriptPorts.set(tabId, port);
 
         port.onMessage.addListener(async (msg) => {
-            // CRITICAL FIX: Accept native simulator types
+            // Route print/hardware data through handleRawData() so it's dispatched
+            // using the correct typed messages (PRINT_DATA_RECEIVED, etc.) that
+            // panel.js actually handles. Previously this was sending { type: 'RAW_DATA' }
+            // which fell through the panel's switch with no action taken.
             if (msg.type === 'POS_SIMULATOR_RAW_DATA' || msg.type === 'RAW_DATA_FROM_PAGE') {
-                if (this.sidePanelPort) {
-                    this.sidePanelPort.postMessage({
-                        type: 'RAW_DATA', // The Panel listens for RAW_DATA
-                        data: msg
-                    });
-                }
+                console.log(`[SW] Received hardware data from content script (type: ${msg.type}, deviceType: ${msg.deviceType}, source: ${msg.source}). Routing through handleRawData().`);
+                this.handleRawData(msg);
+            } else {
+                console.warn(`[SW] Unrecognized message type from content script: ${msg.type}`);
             }
         });
 
