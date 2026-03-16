@@ -60,10 +60,7 @@ class PeripheralSimulatorService {
         this.contentScriptPorts.set(tabId, port);
 
         port.onMessage.addListener(async (msg) => {
-            // Route print/hardware data through handleRawData() so it's dispatched
-            // using the correct typed messages (PRINT_DATA_RECEIVED, etc.) that
-            // panel.js actually handles. Previously this was sending { type: 'RAW_DATA' }
-            // which fell through the panel's switch with no action taken.
+            // Route print/hardware data through handleRawData()
             if (msg.type === 'POS_SIMULATOR_RAW_DATA' || msg.type === 'RAW_DATA_FROM_PAGE') {
                 console.log(`[SW] Received hardware data from content script (type: ${msg.type}, deviceType: ${msg.deviceType}, source: ${msg.source}). Routing through handleRawData().`);
                 this.handleRawData(msg);
@@ -72,6 +69,27 @@ class PeripheralSimulatorService {
                     this.sidePanelPort.postMessage(msg);
                 } else {
                     console.warn('[SW] Dropping DISPLAY_UPDATE because sidePanelPort is disconnected');
+                }
+            } else if (msg.type === 'TERMINAL_CHARGE_REQUEST') {
+                // Forward charge request from POS page → panel terminal simulator
+                console.log('[SW] TERMINAL_CHARGE_REQUEST received from content script:', msg);
+                if (this.sidePanelPort) {
+                    this.sidePanelPort.postMessage({
+                        type:      'TERMINAL_CHARGE_REQUEST',
+                        requestId: msg.requestId,
+                        gateway:   msg.gateway,
+                        amount:    msg.amount,
+                        currency:  msg.currency,
+                        orderId:   msg.orderId,
+                        timestamp: msg.timestamp,
+                    });
+                } else {
+                    console.warn('[SW] No side panel connected — cannot deliver TERMINAL_CHARGE_REQUEST.');
+                }
+            } else if (msg.type === 'TERMINAL_CHARGE_CANCEL') {
+                console.log('[SW] TERMINAL_CHARGE_CANCEL received from content script.');
+                if (this.sidePanelPort) {
+                    this.sidePanelPort.postMessage({ type: 'TERMINAL_CHARGE_CANCEL' });
                 }
             } else {
                 console.warn(`[SW] Unrecognized message type from content script: ${msg.type}`);
@@ -154,6 +172,18 @@ class PeripheralSimulatorService {
                 if (msg.data) {
                     this.handleSendEmail(msg.data);
                 }
+                break;
+            // ── Terminal simulator: panel → POS page ─────────────────────────
+            case 'TERMINAL_SIMULATE_RESPONSE':
+                // Operator clicked Approve / Decline / Timeout in the terminal panel.
+                // Broadcast to all POS content-script ports so TerminalBridge.js resolves.
+                console.log('[SW] Broadcasting TERMINAL_SIMULATE_RESPONSE to all content scripts:', msg);
+                this.broadcastToContentScripts(msg);
+                break;
+            case 'TERMINAL_CHARGE_CANCEL':
+                // POS operator cancelled the pending terminal request from the panel side.
+                console.log('[SW] Broadcasting TERMINAL_CHARGE_CANCEL to all content scripts.');
+                this.broadcastToContentScripts({ type: 'TERMINAL_CHARGE_CANCEL' });
                 break;
         }
     }

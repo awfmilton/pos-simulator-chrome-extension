@@ -45,6 +45,10 @@ License: personal use $5/month, business use $100/month
             <button class="tab-btn" data-tab="display">
                 🖥️ Display
             </button>
+            <button class="tab-btn" data-tab="terminal" id="terminal-tab-btn">
+                💳 Terminal
+                <span id="terminal-tab-badge" class="tab-badge" style="display:none;">0</span>
+            </button>
         </nav>
 
         <div class="tab-panels">
@@ -521,6 +525,58 @@ License: personal use $5/month, business use $100/month
             </div>
         </div>
 
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- Terminal Simulator Panel                           -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <div class="tab-panel" id="terminal-panel">
+                <div class="panel-header">
+                    <h2>Payment Terminal Simulator</h2>
+                    <div class="status-light" id="terminal-status"></div>
+                </div>
+
+                <div class="input-group">
+                    <label for="terminal-brand-select">Active Terminal Brand:</label>
+                    <select id="terminal-brand-select">
+                        <option value="stripe">Stripe Terminal</option>
+                        <option value="moneris">Moneris Cloud Terminal</option>
+                        <option value="square">Square Terminal</option>
+                        <option value="helcim">Helcim Terminal</option>
+                        <option value="elavon">Elavon Converge Terminal</option>
+                        <option value="globalpayments">Global Payments Terminal</option>
+                        <option value="chase">Chase / CyberSource OmniPay</option>
+                        <option value="paypal">PayPal / Zettle Terminal</option>
+                    </select>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Transaction Log</h3>
+                    <div class="activity-log terminal-log">
+                        <p class="log-empty-msg" id="terminal-no-pending">No pending terminal requests.</p>
+                        <ul id="terminal-log-list" class="terminal-log-list"></ul>
+                    </div>
+                </div>
+
+                <div class="button-group terminal-action-group">
+                    <button id="terminal-btn-tap-approved" class="primary-btn" disabled
+                            title="Simulate a contactless NFC tap approval">
+                        📱 Simulate Tap (Approved)
+                    </button>
+                    <button id="terminal-btn-insert-approved" class="secondary-btn" disabled
+                            title="Simulate an EMV chip insert approval">
+                        🔌 Simulate Insert (Approved)
+                    </button>
+                    <button id="terminal-btn-decline-nsf" class="danger-btn" disabled
+                            title="Simulate a card decline (NSF / insufficient funds)">
+                        ❌ Simulate Decline (NSF)
+                    </button>
+                    <button id="terminal-btn-timeout" class="danger-btn" disabled
+                            title="Simulate a terminal timeout (customer did not interact)">
+                        ⏰ Simulate Timeout
+                    </button>
+                </div>
+            </div>
+            <!-- /Terminal Simulator Panel -->
+
         <footer class="footer">
             <div class="connection-status">
                 <span id="connection-indicator" class="status-light disconnected"></span>
@@ -644,6 +700,7 @@ License: personal use $5/month, business use $100/month
     <script src="credit-card-generator.js"></script>
     <script src="virtual-keyboard.js"></script>
     <script src="receipt-manager.js"></script>
+    <script src="payment-terminal-simulator.js"></script>
     <script src="panel.js"></script>
 </body>
 </html>

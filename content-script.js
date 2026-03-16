@@ -52,6 +52,23 @@ class POSContentScript {
             if (request.action === 'CHIP_REMOVE') {
                 this.handleChipRemove(request.data);
             }
+            // ── Terminal simulator response ───────────────────────────────────
+            // Sent by service-worker when the panel operator clicks Approve/Decline/Timeout.
+            // Re-broadcast to the POS page so TerminalBridge.js can resolve/reject.
+            if (request.type === 'TERMINAL_SIMULATE_RESPONSE') {
+                console.log('[CS] Relaying TERMINAL_SIMULATE_RESPONSE to page:', request);
+                window.postMessage({
+                    type:      'POS_TERMINAL_CHARGE_RESPONSE',
+                    outcome:   request.outcome,
+                    method:    request.method,
+                    reference: request.reference,
+                    gateway:   request.gateway,
+                    brand:     request.brand,
+                    reason:    request.reason ?? null,
+                    requestId: request.requestId,
+                    timestamp: request.timestamp,
+                }, '*');
+            }
         });
 
         this.port.onDisconnect.addListener(() => {
@@ -66,10 +83,38 @@ class POSContentScript {
             if (!event.data || !event.data.type) return;
 
             const t = event.data.type;
-            // Route simulator events perfectly without mutating them
+            // Route simulator events without mutating them
             if (t.startsWith('POS_SIMULATOR') || t === 'NETWORK_INTERCEPT' || t === 'HARDWARE_COMMAND') {
                 if (this.port) {
                     this.port.postMessage(event.data);
+                }
+            }
+
+            // ── Terminal Bridge: forward charge requests to the extension ────
+            // TerminalBridge.js posts POS_TERMINAL_CHARGE_REQUEST to window.
+            // We forward it to the service worker, which relays it to the panel.
+            if (t === 'POS_TERMINAL_CHARGE_REQUEST') {
+                console.log('[CS] Forwarding POS_TERMINAL_CHARGE_REQUEST to SW:', event.data);
+                if (this.port) {
+                    this.port.postMessage({
+                        type:      'TERMINAL_CHARGE_REQUEST',
+                        requestId: event.data.requestId ?? ('req_' + Date.now()),
+                        gateway:   event.data.gateway,
+                        amount:    event.data.amount,
+                        currency:  event.data.currency,
+                        orderId:   event.data.orderId,
+                        timestamp: event.data.timestamp,
+                    });
+                } else {
+                    console.warn('[CS] Cannot forward charge request — not connected to SW.');
+                }
+            }
+
+            // ── Terminal Bridge: cancel signal ───────────────────────────────
+            if (t === 'POS_TERMINAL_CHARGE_CANCEL') {
+                console.log('[CS] Forwarding POS_TERMINAL_CHARGE_CANCEL to SW.');
+                if (this.port) {
+                    this.port.postMessage({ type: 'TERMINAL_CHARGE_CANCEL', timestamp: event.data.timestamp });
                 }
             }
         }, false);
