@@ -67,6 +67,12 @@ class PeripheralSimulatorService {
             if (msg.type === 'POS_SIMULATOR_RAW_DATA' || msg.type === 'RAW_DATA_FROM_PAGE') {
                 console.log(`[SW] Received hardware data from content script (type: ${msg.type}, deviceType: ${msg.deviceType}, source: ${msg.source}). Routing through handleRawData().`);
                 this.handleRawData(msg);
+            } else if (msg.type === 'POS_SIMULATOR_DISPLAY_UPDATE') {
+                if (this.sidePanelPort) {
+                    this.sidePanelPort.postMessage(msg);
+                } else {
+                    console.warn('[SW] Dropping DISPLAY_UPDATE because sidePanelPort is disconnected');
+                }
             } else {
                 console.warn(`[SW] Unrecognized message type from content script: ${msg.type}`);
             }
