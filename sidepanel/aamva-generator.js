@@ -36,7 +36,7 @@ class AAMVAGenerator {
         return Math.random().toString().slice(2, 2 + len).padStart(len, '0');
     }
 
-    // Utility to format a date as MMDDCCYY
+    // Utility to format a date as MMDDYYYY (8 chars, exactly as the parser's formatDate expects)
     _formatDate(date) {
         const mm = (date.getMonth() + 1).toString().padStart(2, '0');
         const dd = date.getDate().toString().padStart(2, '0');
@@ -50,6 +50,26 @@ class AAMVAGenerator {
         const dob = new Date(now.getFullYear() - (18 + Math.floor(Math.random() * 40)), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
         const issueDate = new Date(dob.getFullYear() + 16 + Math.floor(Math.random() * 5), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
         const expirationDate = new Date(issueDate.getFullYear() + 4, issueDate.getMonth(), issueDate.getDate());
+
+        return {
+            dob: this._formatDate(dob),
+            issue: this._formatDate(issueDate),
+            expiration: this._formatDate(expirationDate)
+        };
+    }
+
+    /**
+     * FIX (Bug 3): Generate dates for an exact age.
+     * DOB is computed as exactly `age` years before today, so the
+     * person has *just* turned `age` (worst-case cutoff for testing).
+     * @param {number} age - Exact age in whole years
+     */
+    _generateDatesForAge(age) {
+        const now = new Date();
+        // DOB: same month/day as today but `age` years ago
+        const dob = new Date(now.getFullYear() - age, now.getMonth(), now.getDate());
+        const issueDate = new Date(dob.getFullYear() + 16, dob.getMonth(), dob.getDate());
+        const expirationDate = new Date(issueDate.getFullYear() + 5, issueDate.getMonth(), issueDate.getDate());
 
         return {
             dob: this._formatDate(dob),
@@ -72,16 +92,23 @@ class AAMVAGenerator {
     }
 
     // Main generation method
-    generate(cardType = null) {
-        const dates = this._generateDates();
+    // FIX (Bug 3): accepts optional `age` to generate a deterministic DOB for testing
+    generate(cardType = null, age = null) {
+        const dates = (age !== null && Number.isFinite(age))
+            ? this._generateDatesForAge(age)
+            : this._generateDates();
         const state = this._getRandom(this.data.states);
         const selectedCardType = cardType || this._getRandom(this.data.cardTypes);
 
-        // AAMVA Header format: @[RS][CR]ANSI [IIN][Version][Jurisdiction Version][Number of Entries][LF]
+        // AAMVA Header format: @[RS]ANSI [IIN][Version][Jurisdiction Version][Number of Entries][CR]
+        // FIX (Bug 1): The RS immediately precedes "ANSI" — no CR in between.
+        //              Inserting \r here breaks the parser regex /^@[\u001e\x1e]?ANSI\s(\d{6})(\d{6})/
+        // FIX (Bug 2): Fields within the subfile are CR-delimited (\r) per AAMVA spec and
+        //              match the existing parser test fixtures (e.g. DBB08241955\r...).
         const complianceIndicator = "@";
-        const dataElementSeparator = "\n"; // AAMVA Spec uses LF for element separation
-        const recordSeparator = "\x1e"; // ASCII RS (Record Separator)
-        const segmentTerminator = "\r"; // ASCII CR (Carriage Return) for segment termination
+        const dataElementSeparator = "\r"; // FIX: CR (\r) is the correct AAMVA field delimiter
+        const recordSeparator = "\x1e";    // ASCII RS (Record Separator) — placed directly before ANSI
+        const segmentTerminator = "\r";    // kept for subfile trailing terminator use only
 
         // File format
         const fileType = "ANSI ";
@@ -90,8 +117,8 @@ class AAMVAGenerator {
         const jurisdictionVersion = "00"; // Updated to 00 for better compatibility
         const numEntries = "01"; // One subfile
 
-        // Build the header according to AAMVA spec: @[RS][CR]ANSI...[LF]
-        const header = `${complianceIndicator}${recordSeparator}${segmentTerminator}${fileType}${issuerId}${aamvaVersion}${jurisdictionVersion}${numEntries}${dataElementSeparator}`;
+        // FIX (Bug 1): Header is @[RS]ANSI...[CR] — no segmentTerminator between RS and "ANSI"
+        const header = `${complianceIndicator}${recordSeparator}${fileType}${issuerId}${aamvaVersion}${jurisdictionVersion}${numEntries}${dataElementSeparator}`;
 
         // Subfile designator (DL for Driver's License, ID for ID Card)
         const subfileDesignator = selectedCardType;
@@ -144,16 +171,17 @@ class AAMVAGenerator {
     }
 
     // Generate a specific type of card
-    generateDriversLicense() {
-        return this.generate('DL');
+    // FIX (Bug 3): all public methods now forward the `age` param
+    generateDriversLicense(age = null) {
+        return this.generate('DL', age);
     }
 
-    generateIDCard() {
-        return this.generate('ID');
+    generateIDCard(age = null) {
+        return this.generate('ID', age);
     }
 
     // Legacy method for backward compatibility
-    generateAAMVA() {
-        return this.generate();
+    generateAAMVA(age = null) {
+        return this.generate(null, age);
     }
 }
