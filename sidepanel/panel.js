@@ -397,8 +397,10 @@ class POSSimulatorPanel {
                 this.logActivity('drawer', `Direct drawer command from ${msg.source} (${msg.drawerType || 'unknown'})`);
                 this.triggerDrawerOpen(msg.source);
 
-                // Show notification
                 this.showDrawerNotification(1, `Direct ${msg.source}`);
+                break;
+            case 'POS_SIMULATOR_DISPLAY_UPDATE':
+                this.updateLineDisplayFromPOS(msg);
                 break;
         }
     }
@@ -865,6 +867,26 @@ class POSSimulatorPanel {
     }
 
     // Line Display Methods
+    updateLineDisplayFromPOS(data) {
+        if (!data) return;
+        const l1 = data.line1 || '';
+        const l2 = data.line2 || '';
+
+        // Update visual mock DOM
+        const displayLine1 = document.getElementById('display-line1');
+        const displayLine2 = document.getElementById('display-line2');
+        if (displayLine1) displayLine1.textContent = l1.padEnd(20, ' ').substring(0, 20);
+        if (displayLine2) displayLine2.textContent = l2.padEnd(20, ' ').substring(0, 20);
+
+        // Sync the form inputs
+        const inputLine1 = document.getElementById('line1-input');
+        const inputLine2 = document.getElementById('line2-input');
+        if (inputLine1) inputLine1.value = l1.trimEnd();
+        if (inputLine2) inputLine2.value = l2.trimEnd();
+
+        this.logActivity('display', `Display updated from POS: "${l1.trim()}" / "${l2.trim()}"`);
+    }
+
     updateLineDisplay() {
         const line1 = document.getElementById('line1-input').value;
         const line2 = document.getElementById('line2-input').value;
