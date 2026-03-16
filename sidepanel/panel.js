@@ -372,6 +372,12 @@ class POSSimulatorPanel {
 
         // Check connection status every 5 seconds
         setInterval(() => this.sendMessage('CHECK_CONNECTION'), 5000);
+
+        // Initialise the payment terminal simulator module with the SW port
+        if (typeof window.initPaymentTerminalSimulator === 'function') {
+            window.initPaymentTerminalSimulator(this.port);
+            console.log('[PANEL] Payment Terminal Simulator initialized.');
+        }
     }
 
     handlePortMessage(msg) {
@@ -401,6 +407,15 @@ class POSSimulatorPanel {
                 break;
             case 'POS_SIMULATOR_DISPLAY_UPDATE':
                 this.updateLineDisplayFromPOS(msg);
+                break;
+            // ── Payment terminal simulator ──────────────────────────
+            case 'TERMINAL_CHARGE_REQUEST':
+                // A charge has arrived from the POS. Hand off to the terminal simulator module.
+                if (typeof window.handleTerminalChargeRequest === 'function') {
+                    window.handleTerminalChargeRequest(msg);
+                } else {
+                    console.warn('[PANEL] handleTerminalChargeRequest not found — payment-terminal-simulator.js may not have loaded.');
+                }
                 break;
         }
     }
