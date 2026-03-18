@@ -32,6 +32,7 @@
         partialAuthPercent: 70, // percentage of amount to authorize for partial auth (default 70%)
         forceResult: '',        // Engineer's Toolbar: force next result ('approved'|'nsf'|'stolen'|'expired'|'cvc'|'timeout'|'')
         environment: 'mock',    // 'sandbox' | 'mock' — from incoming charge request
+        posOrigin: 'http://localhost:8000',  // POS server origin for stripe_simulate.php calls
         gearClickCount: 0,      // triple-click counter to reveal toolbar
         gearClickTimer: null,
     };
@@ -47,7 +48,8 @@
         elBadge,
         // Engineer's Toolbar
         elEngineerToggle, elEngineerToolbar, elForceResultSelect,
-        elSandboxStatusBadge, elSandboxConnectionRow, elSandboxConnectionText;
+        elSandboxStatusBadge, elSandboxConnectionRow, elSandboxConnectionText,
+        elStripeCardSelect;
 
     // ─── Reason messages sent back to the POS form ───────────────────────────
     const REASON_MESSAGES = {
@@ -76,18 +78,24 @@
      */
     window.handleTerminalChargeRequest = function (data) {
         const req = {
-            id:        data.requestId ?? ('req_' + Date.now()),
-            gateway:   data.gateway ?? 'unknown',
-            amount:    typeof data.amount === 'number' ? data.amount.toFixed(2) : data.amount,
-            currency:  data.currency ?? 'CAD',
-            orderId:   data.orderId ?? null,
-            timestamp: new Date().toLocaleTimeString(),
+            id:               data.requestId ?? ('req_' + Date.now()),
+            gateway:          data.gateway ?? 'unknown',
+            amount:           typeof data.amount === 'number' ? data.amount.toFixed(2) : data.amount,
+            currency:         data.currency ?? 'CAD',
+            orderId:          data.orderId ?? null,
+            timestamp:        new Date().toLocaleTimeString(),
+            // Stripe Push-to-Reader sandbox fields
+            payment_intent_id: data.payment_intent_id ?? null,
+            reader_id:         data.reader_id         ?? null,
         };
 
         // Update environment from incoming request
         if (data.environment) {
             state.environment = data.environment;
             _updateSandboxBadge(data.environment);
+        }
+        if (data.posOrigin) {
+            state.posOrigin = data.posOrigin;
         }
 
         // If a Force Result is set, auto-respond without operator interaction
@@ -150,6 +158,7 @@
         elSandboxStatusBadge    = document.getElementById('sandbox-status-badge');
         elSandboxConnectionRow  = document.getElementById('sandbox-connection-row');
         elSandboxConnectionText = document.getElementById('sandbox-connection-text');
+        elStripeCardSelect      = document.getElementById('stripe-test-card-select');
     }
 
     function _bindEvents() {
@@ -204,23 +213,7 @@
             });
         }
 
-        // Stripe test amount shortcut buttons — post a synthetic charge request
-        document.querySelectorAll('.stripe-test-amount-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (state.pendingRequests.length === 0) return;
-                // Override the pending request's amount with the test amount
-                const testAmount = parseFloat(btn.dataset.amount);
-                if (state.pendingRequests[0]) {
-                    state.pendingRequests[0].amount = testAmount.toFixed(2);
-                    // Re-render the log entry amount
-                    const li = document.getElementById('terminal-entry-' + state.pendingRequests[0].id);
-                    if (li) {
-                        const amountEl = li.querySelector('.log-amount');
-                        if (amountEl) amountEl.textContent = `${state.pendingRequests[0].currency} $${testAmount.toFixed(2)}`;
-                    }
-                }
-            });
-        });
+        // Stripe test card selector — value is read by _stripeCardForOutcome() at response time
     }
 
     function _btn(el, handler) {
@@ -720,7 +713,121 @@
             return;
         }
 
-        const req       = state.pendingRequests.shift();
+        const req = state.pendingRequests[0]; // peek — shift after dispatch
+
+        // ── Stripe sandbox Push-to-Reader ─────────────────────────────────────
+        // When environment=sandbox and gateway=stripe, the backend already created
+        // a real PaymentIntent and pushed it to the simulated reader.
+        // We call stripe_simulate.php to present the selected test card,
+        // then use the real response as the vendorPayload.
+        if (state.environment === 'sandbox' && req.gateway === 'stripe' && req.payment_intent_id && req.reader_id) {
+            const cardNumber = _stripeCardForOutcome(outcome, method);
+            _callStripeSimulate(req, cardNumber, outcome, method);
+            return; // _callStripeSimulate will shift+dispatch asynchronously
+        }
+
+        _dispatchResponse(outcome, method, req);
+    }
+
+    /**
+     * Return the Stripe test card number to use for stripe_simulate.php.
+     * If the Engineer's Toolbar card selector has a value, that takes precedence
+     * (operator explicitly chose a card).  Otherwise derive from outcome/method.
+     */
+    function _stripeCardForOutcome(outcome, method) {
+        if (elStripeCardSelect && elStripeCardSelect.value) {
+            return elStripeCardSelect.value;
+        }
+        if (outcome === 'approved' || outcome === 'approved_not_captured' || outcome === 'partial_auth') {
+            return '4242424242424242';
+        }
+        return {
+            nsf:              '4000000000009995',
+            stolen:           '4000000000009987',
+            expired:          '4000000000000069',
+            cvc:              '4000000000000127',
+            processing_error: '4000000000009995',
+            timeout:          '4242424242424242',
+        }[method] ?? '4242424242424242';
+    }
+
+    /**
+     * POST to stripe_simulate.php, then dispatch the real PI result as the response.
+     */
+    function _callStripeSimulate(req, cardNumber, outcome, method) {
+        // Determine the POS origin from state (set during init or from message)
+        const posOrigin = state.posOrigin || 'http://localhost:8000';
+
+        fetch(`${posOrigin}/api/stripe_simulate.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                reader_id:          req.reader_id,
+                payment_intent_id:  req.payment_intent_id,
+                card_number:        cardNumber,
+            }),
+        })
+        .then(r => r.json())
+        .then(simResult => {
+            state.pendingRequests.shift();
+            const brand = state.activeBrand;
+
+            // Build real vendor payload from the PHP stripe_simulate result
+            // simResult.data is the standardized gateway response data
+            const vendorPayload = simResult.data ?? _buildVendorPayload(brand, outcome, method, req);
+
+            // Override outcome with actual result from PHP backend
+            const realOutcome = simResult.outcome ?? outcome;
+
+            const payload = {
+                type:          'TERMINAL_SIMULATE_RESPONSE',
+                requestId:     req.id,
+                outcome:       realOutcome,
+                method,
+                reference:     simResult.transaction_id ?? req.payment_intent_id,
+                gateway:       req.gateway,
+                brand,
+                timestamp:     new Date().toISOString(),
+                vendorPayload,
+                decline_code:  simResult.decline_code ?? null,
+            };
+
+            if (realOutcome !== 'approved' && realOutcome !== 'approved_not_captured') {
+                payload.reason = simResult.message
+                    ?? REASON_MESSAGES[simResult.decline_code]
+                    ?? REASON_MESSAGES[method]
+                    ?? 'Card declined.';
+            }
+            if (realOutcome === 'partial_auth') {
+                const partialAmt = (_partialCents(req) / 100).toFixed(2);
+                payload.reason          = REASON_MESSAGES.partial_auth;
+                payload.partialAmount   = partialAmt;
+                payload.remainingAmount = (parseFloat(req.amount) - parseFloat(partialAmt)).toFixed(2);
+            }
+
+            if (state.swPort) {
+                state.swPort.postMessage(payload);
+                console.log('[TerminalSim] Stripe sandbox response sent:', payload);
+            }
+
+            _markLogEntryResolved(req.id, realOutcome, method);
+            _refreshButtonState();
+            _updateBadge();
+        })
+        .catch(err => {
+            console.error('[TerminalSim] stripe_simulate.php call failed:', err);
+            // Fall back to mock response so the operator isn't stuck
+            state.pendingRequests.shift();
+            _dispatchResponseDirect(outcome, method, req);
+        });
+    }
+
+    function _dispatchResponse(outcome, method, req) {
+        state.pendingRequests.shift();
+        _dispatchResponseDirect(outcome, method, req);
+    }
+
+    function _dispatchResponseDirect(outcome, method, req) {
         const brand     = state.activeBrand;
         const reference = `${brand}_${method}_${Date.now()}`;
 
