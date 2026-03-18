@@ -570,6 +570,16 @@ License: personal use $5/month, business use $100/month
                         </select>
                     </div>
 
+                    <!-- Moneris QA sandbox card selector (store1 / yesguy / esqa.moneris.com) -->
+                    <div class="engineer-toolbar-row" id="moneris-card-row" style="display:none;">
+                        <label for="moneris-test-card-select">Moneris QA card:</label>
+                        <select id="moneris-test-card-select">
+                            <option value="4005550000000019">4005 … 0019 — Visa (Approved)</option>
+                            <option value="5454545454545454">5454 … 5454 — MasterCard (Approved)</option>
+                            <option value="4111111111111111">4111 … 1111 — Visa (Approved, standard)</option>
+                        </select>
+                    </div>
+
                     <div class="engineer-toolbar-row" id="sandbox-connection-row" style="display:none;">
                         <span id="sandbox-connection-text" style="font-size:0.8rem;color:#6b7280;"></span>
                     </div>
@@ -589,6 +599,48 @@ License: personal use $5/month, business use $100/month
                         <option value="paypal">PayPal / Zettle Terminal</option>
                     </select>
                 </div>
+
+                <!-- ── Moneris iPP320 / P400 Virtual Terminal Display ─────────── -->
+                <div id="moneris-display-section" class="moneris-terminal-wrap" style="display:none;">
+                    <div class="moneris-terminal-body">
+                        <div class="moneris-terminal-header">
+                            <span class="moneris-logo">Moneris</span>
+                            <span class="moneris-model">iPP320</span>
+                        </div>
+                        <div class="moneris-screen">
+                            <div class="moneris-screen-inner">
+                                <div class="moneris-screen-line" id="moneris-screen-line1">Moneris</div>
+                                <div class="moneris-screen-line moneris-screen-line2" id="moneris-screen-line2">Welcome</div>
+                            </div>
+                        </div>
+                        <div class="moneris-cloud-row">
+                            <span class="moneris-cloud-label">Cloud Pairing Token:</span>
+                            <span class="moneris-pairing-token" id="moneris-pairing-token"></span>
+                        </div>
+                        <div class="moneris-keypad">
+                            <div class="moneris-key moneris-key--fn">F1</div>
+                            <div class="moneris-key moneris-key--fn">F2</div>
+                            <div class="moneris-key moneris-key--fn">F3</div>
+                            <div class="moneris-key moneris-key--fn">F4</div>
+                            <div class="moneris-key">1</div>
+                            <div class="moneris-key">2</div>
+                            <div class="moneris-key">3</div>
+                            <div class="moneris-key moneris-key--red">✕</div>
+                            <div class="moneris-key">4</div>
+                            <div class="moneris-key">5</div>
+                            <div class="moneris-key">6</div>
+                            <div class="moneris-key moneris-key--yellow">⌫</div>
+                            <div class="moneris-key">7</div>
+                            <div class="moneris-key">8</div>
+                            <div class="moneris-key">9</div>
+                            <div class="moneris-key moneris-key--green">↵</div>
+                            <div class="moneris-key moneris-key--wide">0</div>
+                            <div class="moneris-key">.</div>
+                        </div>
+                        <div class="moneris-card-slot-label">← Insert / Swipe Card</div>
+                    </div>
+                </div>
+                <!-- /Moneris Virtual Display -->
 
                 <div class="panel-section">
                     <h3>Transaction Log</h3>
