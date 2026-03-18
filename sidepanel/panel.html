@@ -558,18 +558,16 @@ License: personal use $5/month, business use $100/month
                         </select>
                     </div>
 
-                    <div class="engineer-toolbar-row">
-                        <span>Stripe test amounts:</span>
-                        <div class="button-group" style="gap:4px;flex-wrap:wrap;">
-                            <button class="stripe-test-amount-btn secondary-btn" data-amount="0.02"
-                                    title="Triggers insufficient_funds in Stripe sandbox">$0.02 NSF</button>
-                            <button class="stripe-test-amount-btn secondary-btn" data-amount="0.05"
-                                    title="Triggers expired_card in Stripe sandbox">$0.05 Expired</button>
-                            <button class="stripe-test-amount-btn secondary-btn" data-amount="0.75"
-                                    title="Triggers generic_decline in Stripe sandbox">$0.75 Decline</button>
-                            <button class="stripe-test-amount-btn secondary-btn" data-amount="1.05"
-                                    title="Triggers incorrect_cvc in Stripe sandbox">$1.05 CVC</button>
-                        </div>
+                    <!-- Stripe sandbox card selector — only meaningful when environment=sandbox -->
+                    <div class="engineer-toolbar-row" id="stripe-card-row">
+                        <label for="stripe-test-card-select">Stripe test card:</label>
+                        <select id="stripe-test-card-select">
+                            <option value="4242424242424242">4242 … 4242 — Approved</option>
+                            <option value="4000000000009995">4000 … 9995 — Insufficient Funds (NSF)</option>
+                            <option value="4000000000000069">4000 … 0069 — Expired Card</option>
+                            <option value="4000000000000127">4000 … 0127 — Incorrect CVC</option>
+                            <option value="4000000000009987">4000 … 9987 — Stolen Card</option>
+                        </select>
                     </div>
 
                     <div class="engineer-toolbar-row" id="sandbox-connection-row" style="display:none;">
