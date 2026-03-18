@@ -556,23 +556,71 @@ License: personal use $5/month, business use $100/month
                     </div>
                 </div>
 
-                <div class="button-group terminal-action-group">
-                    <button id="terminal-btn-tap-approved" class="primary-btn" disabled
-                            title="Simulate a contactless NFC tap approval">
-                        📱 Simulate Tap (Approved)
-                    </button>
-                    <button id="terminal-btn-insert-approved" class="secondary-btn" disabled
-                            title="Simulate an EMV chip insert approval">
-                        🔌 Simulate Insert (Approved)
-                    </button>
-                    <button id="terminal-btn-decline-nsf" class="danger-btn" disabled
-                            title="Simulate a card decline (NSF / insufficient funds)">
-                        ❌ Simulate Decline (NSF)
-                    </button>
-                    <button id="terminal-btn-timeout" class="danger-btn" disabled
-                            title="Simulate a terminal timeout (customer did not interact)">
-                        ⏰ Simulate Timeout
-                    </button>
+                <div class="panel-section">
+                    <h3>Approvals</h3>
+                    <div class="button-group terminal-action-group">
+                        <button id="terminal-btn-tap-approved" class="primary-btn" disabled
+                                title="Simulate a contactless NFC/Apple Pay tap — full approval">
+                            📱 Tap (Approved)
+                        </button>
+                        <button id="terminal-btn-insert-approved" class="secondary-btn" disabled
+                                title="Simulate an EMV chip insert — full approval">
+                            🔌 Insert / Chip (Approved)
+                        </button>
+                        <button id="terminal-btn-swipe-approved" class="secondary-btn" disabled
+                                title="Simulate a magnetic-stripe swipe — full approval">
+                            💳 Swipe (Approved)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-section" id="terminal-partial-section">
+                    <h3>Partial &amp; Delayed</h3>
+                    <div class="input-group" style="flex-direction:row;align-items:center;gap:8px;">
+                        <label for="terminal-partial-auth-pct" style="white-space:nowrap;">Partial auth %:</label>
+                        <input type="number" id="terminal-partial-auth-pct" min="1" max="99" value="70"
+                               style="width:64px;" title="Percentage of the requested amount to authorise">
+                    </div>
+                    <div class="button-group terminal-action-group">
+                        <button id="terminal-btn-partial-auth" class="secondary-btn" disabled
+                                title="Simulate a partial authorisation (prepaid/debit card with insufficient balance for full amount)">
+                            🔶 Partial Auth (Tap)
+                        </button>
+                        <button id="terminal-btn-square-not-captured" class="secondary-btn" disabled
+                                title="Square only — APPROVED but autocomplete=false. Requires a separate capture call.">
+                            🔒 Approved, Not Captured (Square)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Declines</h3>
+                    <div class="button-group terminal-action-group">
+                        <button id="terminal-btn-decline-nsf" class="danger-btn" disabled
+                                title="Insufficient funds / NSF">
+                            ❌ Insufficient Funds (NSF)
+                        </button>
+                        <button id="terminal-btn-decline-stolen" class="danger-btn" disabled
+                                title="Card reported stolen — issuer requests card pickup">
+                            🚨 Stolen Card
+                        </button>
+                        <button id="terminal-btn-decline-expired" class="danger-btn" disabled
+                                title="Card has expired">
+                            📅 Expired Card
+                        </button>
+                        <button id="terminal-btn-decline-cvc" class="danger-btn" disabled
+                                title="CVV / CVC / CVD verification failed">
+                            🔐 CVV / CVC Failed
+                        </button>
+                        <button id="terminal-btn-decline-processing" class="danger-btn" disabled
+                                title="Generic processing error — retriable">
+                            ⚠️ Processing Error
+                        </button>
+                        <button id="terminal-btn-timeout" class="danger-btn" disabled
+                                title="Customer did not interact — terminal timed out">
+                            ⏰ Timeout
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- /Terminal Simulator Panel -->
