@@ -532,7 +532,51 @@ License: personal use $5/month, business use $100/month
                 <div class="panel-header">
                     <h2>Payment Terminal Simulator</h2>
                     <div class="status-light" id="terminal-status"></div>
+                    <!-- Hidden gear icon — triple-click to reveal Engineer's Toolbar -->
+                    <button id="engineer-toolbar-toggle" title="Engineer's Toolbar (triple-click)"
+                            style="background:none;border:none;cursor:pointer;font-size:1rem;opacity:0.15;margin-left:auto;padding:2px 6px;"
+                            aria-label="Toggle Engineer Toolbar">⚙️</button>
                 </div>
+
+                <!-- ── Engineer's Toolbar (hidden by default) ───────────────── -->
+                <div id="engineer-toolbar" class="engineer-toolbar" style="display:none;">
+                    <div class="engineer-toolbar-header">
+                        <span>🛠 Engineer's Toolbar</span>
+                        <span id="sandbox-status-badge" class="sandbox-badge mock">● Mock Mode</span>
+                    </div>
+
+                    <div class="engineer-toolbar-row">
+                        <label for="force-result-select">Force Next Result:</label>
+                        <select id="force-result-select">
+                            <option value="">— None (manual) —</option>
+                            <option value="approved">✅ Approved (full)</option>
+                            <option value="nsf">❌ NSF / Insufficient Funds</option>
+                            <option value="stolen">🚨 Stolen Card</option>
+                            <option value="expired">📅 Expired Card</option>
+                            <option value="cvc">🔐 CVV / CVC Failed</option>
+                            <option value="timeout">⏰ Timeout</option>
+                        </select>
+                    </div>
+
+                    <div class="engineer-toolbar-row">
+                        <span>Stripe test amounts:</span>
+                        <div class="button-group" style="gap:4px;flex-wrap:wrap;">
+                            <button class="stripe-test-amount-btn secondary-btn" data-amount="0.02"
+                                    title="Triggers insufficient_funds in Stripe sandbox">$0.02 NSF</button>
+                            <button class="stripe-test-amount-btn secondary-btn" data-amount="0.05"
+                                    title="Triggers expired_card in Stripe sandbox">$0.05 Expired</button>
+                            <button class="stripe-test-amount-btn secondary-btn" data-amount="0.75"
+                                    title="Triggers generic_decline in Stripe sandbox">$0.75 Decline</button>
+                            <button class="stripe-test-amount-btn secondary-btn" data-amount="1.05"
+                                    title="Triggers incorrect_cvc in Stripe sandbox">$1.05 CVC</button>
+                        </div>
+                    </div>
+
+                    <div class="engineer-toolbar-row" id="sandbox-connection-row" style="display:none;">
+                        <span id="sandbox-connection-text" style="font-size:0.8rem;color:#6b7280;"></span>
+                    </div>
+                </div>
+                <!-- /Engineer's Toolbar -->
 
                 <div class="input-group">
                     <label for="terminal-brand-select">Active Terminal Brand:</label>

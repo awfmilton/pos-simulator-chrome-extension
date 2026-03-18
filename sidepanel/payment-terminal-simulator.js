@@ -30,6 +30,10 @@
         activeBrand: 'stripe',  // currently selected terminal brand
         swPort: null,           // reference to the SW MessagePort (injected via init)
         partialAuthPercent: 70, // percentage of amount to authorize for partial auth (default 70%)
+        forceResult: '',        // Engineer's Toolbar: force next result ('approved'|'nsf'|'stolen'|'expired'|'cvc'|'timeout'|'')
+        environment: 'mock',    // 'sandbox' | 'mock' — from incoming charge request
+        gearClickCount: 0,      // triple-click counter to reveal toolbar
+        gearClickTimer: null,
     };
 
     // ─── DOM references ──────────────────────────────────────────────────────
@@ -40,7 +44,10 @@
         elBtnDeclineCVC, elBtnDeclineProcessing,
         elBtnTimeout,
         elPartialAuthInput,
-        elBadge;
+        elBadge,
+        // Engineer's Toolbar
+        elEngineerToggle, elEngineerToolbar, elForceResultSelect,
+        elSandboxStatusBadge, elSandboxConnectionRow, elSandboxConnectionText;
 
     // ─── Reason messages sent back to the POS form ───────────────────────────
     const REASON_MESSAGES = {
@@ -73,8 +80,35 @@
             gateway:   data.gateway ?? 'unknown',
             amount:    typeof data.amount === 'number' ? data.amount.toFixed(2) : data.amount,
             currency:  data.currency ?? 'CAD',
+            orderId:   data.orderId ?? null,
             timestamp: new Date().toLocaleTimeString(),
         };
+
+        // Update environment from incoming request
+        if (data.environment) {
+            state.environment = data.environment;
+            _updateSandboxBadge(data.environment);
+        }
+
+        // If a Force Result is set, auto-respond without operator interaction
+        if (state.forceResult) {
+            state.pendingRequests.push(req);
+            _addLogEntry(req);
+            _updateBadge();
+            const forced = state.forceResult;
+            // Map force result to (outcome, method)
+            const forceMap = {
+                approved: ['approved',  'tap'],
+                nsf:      ['declined',  'nsf'],
+                stolen:   ['declined',  'stolen'],
+                expired:  ['declined',  'expired'],
+                cvc:      ['declined',  'cvc'],
+                timeout:  ['timeout',   'timeout'],
+            };
+            const [outcome, method] = forceMap[forced] ?? ['approved', 'tap'];
+            setTimeout(() => _sendResponse(outcome, method), 300);
+            return;
+        }
 
         state.pendingRequests.push(req);
         _addLogEntry(req);
@@ -93,22 +127,29 @@
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
     function _cacheDOM() {
-        elBrandSelect          = document.getElementById('terminal-brand-select');
-        elLogList              = document.getElementById('terminal-log-list');
-        elNoPending            = document.getElementById('terminal-no-pending');
-        elBtnTapApproved       = document.getElementById('terminal-btn-tap-approved');
-        elBtnInsertApproved    = document.getElementById('terminal-btn-insert-approved');
-        elBtnSwipeApproved     = document.getElementById('terminal-btn-swipe-approved');
-        elBtnPartialAuth       = document.getElementById('terminal-btn-partial-auth');
-        elBtnSquareNotCaptured = document.getElementById('terminal-btn-square-not-captured');
-        elBtnDeclineNSF        = document.getElementById('terminal-btn-decline-nsf');
-        elBtnDeclineStolen     = document.getElementById('terminal-btn-decline-stolen');
-        elBtnDeclineExpired    = document.getElementById('terminal-btn-decline-expired');
-        elBtnDeclineCVC        = document.getElementById('terminal-btn-decline-cvc');
-        elBtnDeclineProcessing = document.getElementById('terminal-btn-decline-processing');
-        elBtnTimeout           = document.getElementById('terminal-btn-timeout');
-        elPartialAuthInput     = document.getElementById('terminal-partial-auth-pct');
-        elBadge                = document.getElementById('terminal-tab-badge');
+        elBrandSelect           = document.getElementById('terminal-brand-select');
+        elLogList               = document.getElementById('terminal-log-list');
+        elNoPending             = document.getElementById('terminal-no-pending');
+        elBtnTapApproved        = document.getElementById('terminal-btn-tap-approved');
+        elBtnInsertApproved     = document.getElementById('terminal-btn-insert-approved');
+        elBtnSwipeApproved      = document.getElementById('terminal-btn-swipe-approved');
+        elBtnPartialAuth        = document.getElementById('terminal-btn-partial-auth');
+        elBtnSquareNotCaptured  = document.getElementById('terminal-btn-square-not-captured');
+        elBtnDeclineNSF         = document.getElementById('terminal-btn-decline-nsf');
+        elBtnDeclineStolen      = document.getElementById('terminal-btn-decline-stolen');
+        elBtnDeclineExpired     = document.getElementById('terminal-btn-decline-expired');
+        elBtnDeclineCVC         = document.getElementById('terminal-btn-decline-cvc');
+        elBtnDeclineProcessing  = document.getElementById('terminal-btn-decline-processing');
+        elBtnTimeout            = document.getElementById('terminal-btn-timeout');
+        elPartialAuthInput      = document.getElementById('terminal-partial-auth-pct');
+        elBadge                 = document.getElementById('terminal-tab-badge');
+        // Engineer's Toolbar
+        elEngineerToggle        = document.getElementById('engineer-toolbar-toggle');
+        elEngineerToolbar       = document.getElementById('engineer-toolbar');
+        elForceResultSelect     = document.getElementById('force-result-select');
+        elSandboxStatusBadge    = document.getElementById('sandbox-status-badge');
+        elSandboxConnectionRow  = document.getElementById('sandbox-connection-row');
+        elSandboxConnectionText = document.getElementById('sandbox-connection-text');
     }
 
     function _bindEvents() {
@@ -137,6 +178,49 @@
         _btn(elBtnDeclineCVC,         () => _sendResponse('declined',             'cvc'));
         _btn(elBtnDeclineProcessing,  () => _sendResponse('declined',             'processing_error'));
         _btn(elBtnTimeout,            () => _sendResponse('timeout',              'timeout'));
+
+        // ── Engineer's Toolbar ───────────────────────────────────────────────
+        // Triple-click the gear icon to reveal the toolbar
+        if (elEngineerToggle) {
+            elEngineerToggle.addEventListener('click', () => {
+                state.gearClickCount++;
+                clearTimeout(state.gearClickTimer);
+                state.gearClickTimer = setTimeout(() => { state.gearClickCount = 0; }, 600);
+                if (state.gearClickCount >= 3) {
+                    state.gearClickCount = 0;
+                    if (elEngineerToolbar) {
+                        const visible = elEngineerToolbar.style.display !== 'none';
+                        elEngineerToolbar.style.display = visible ? 'none' : 'block';
+                        elEngineerToggle.style.opacity  = visible ? '0.15' : '0.8';
+                    }
+                }
+            });
+        }
+
+        // Force Result dropdown
+        if (elForceResultSelect) {
+            elForceResultSelect.addEventListener('change', () => {
+                state.forceResult = elForceResultSelect.value;
+            });
+        }
+
+        // Stripe test amount shortcut buttons — post a synthetic charge request
+        document.querySelectorAll('.stripe-test-amount-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (state.pendingRequests.length === 0) return;
+                // Override the pending request's amount with the test amount
+                const testAmount = parseFloat(btn.dataset.amount);
+                if (state.pendingRequests[0]) {
+                    state.pendingRequests[0].amount = testAmount.toFixed(2);
+                    // Re-render the log entry amount
+                    const li = document.getElementById('terminal-entry-' + state.pendingRequests[0].id);
+                    if (li) {
+                        const amountEl = li.querySelector('.log-amount');
+                        if (amountEl) amountEl.textContent = `${state.pendingRequests[0].currency} $${testAmount.toFixed(2)}`;
+                    }
+                }
+            });
+        });
     }
 
     function _btn(el, handler) {
@@ -751,6 +835,21 @@
             elavon: 'Elavon', globalpayments: 'Global Payments'
         };
         return labels[id] ?? id;
+    }
+
+    function _updateSandboxBadge(environment) {
+        if (!elSandboxStatusBadge) return;
+        if (environment === 'sandbox') {
+            elSandboxStatusBadge.textContent = '● Sandbox';
+            elSandboxStatusBadge.className   = 'sandbox-badge sandbox';
+            if (elSandboxConnectionRow)  elSandboxConnectionRow.style.display  = '';
+            if (elSandboxConnectionText) elSandboxConnectionText.textContent =
+                'Connected to sandbox — responses will call real sandbox APIs via PHP backend.';
+        } else {
+            elSandboxStatusBadge.textContent = '● Mock Mode';
+            elSandboxStatusBadge.className   = 'sandbox-badge mock';
+            if (elSandboxConnectionRow)  elSandboxConnectionRow.style.display  = 'none';
+        }
     }
 
 })();
