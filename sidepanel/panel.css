@@ -2104,3 +2104,139 @@ input:checked + .slider:before {
     background: #a6e3a1;
     color: #1e3a2e;
 }
+
+/* ── Moneris iPP320 / P400 Virtual Terminal ─────────────────────── */
+.moneris-terminal-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0 14px;
+}
+
+.moneris-terminal-body {
+    background: #2a2d35;
+    border: 2px solid #4a4e5c;
+    border-radius: 10px;
+    padding: 10px 12px 8px;
+    width: 180px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    font-family: 'Courier New', monospace;
+}
+
+.moneris-terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.moneris-logo {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #e84343;   /* Moneris red */
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.moneris-model {
+    font-size: 0.55rem;
+    color: #6b7280;
+    letter-spacing: 0.05em;
+}
+
+.moneris-screen {
+    background: #1a3a1a;
+    border: 1px solid #2d5a2d;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    min-height: 44px;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+}
+
+.moneris-screen-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.moneris-screen-line {
+    color: #6dff6d;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 6px #00ff0066;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.moneris-screen-line2 {
+    color: #4dc94d;
+    font-size: 0.65rem;
+}
+
+.moneris-cloud-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+    font-size: 0.58rem;
+    flex-wrap: wrap;
+}
+
+.moneris-cloud-label {
+    color: #6b7280;
+}
+
+.moneris-pairing-token {
+    color: #89b4fa;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    font-size: 0.65rem;
+    background: #1e2030;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid #313244;
+}
+
+.moneris-keypad {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+    margin-bottom: 5px;
+}
+
+.moneris-key {
+    background: #3d4050;
+    border: 1px solid #525568;
+    border-radius: 3px;
+    color: #cdd6f4;
+    font-size: 0.58rem;
+    text-align: center;
+    padding: 3px 2px;
+    cursor: default;
+    user-select: none;
+    box-shadow: 0 2px 0 #22242e;
+}
+
+.moneris-key--fn {
+    background: #2d3141;
+    color: #89b4fa;
+    font-size: 0.52rem;
+}
+
+.moneris-key--red    { background: #5c1a1a; color: #f38ba8; border-color: #7d2424; }
+.moneris-key--yellow { background: #4a3c10; color: #f9e2af; border-color: #6b5515; }
+.moneris-key--green  { background: #1a3a1a; color: #a6e3a1; border-color: #2d5a2d; }
+
+.moneris-key--wide {
+    grid-column: span 2;
+}
+
+.moneris-card-slot-label {
+    font-size: 0.52rem;
+    color: #6b7280;
+    text-align: center;
+    border-top: 1px dashed #3b3f4e;
+    padding-top: 4px;
+    letter-spacing: 0.03em;
+}

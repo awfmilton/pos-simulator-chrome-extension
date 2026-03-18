@@ -49,7 +49,11 @@
         // Engineer's Toolbar
         elEngineerToggle, elEngineerToolbar, elForceResultSelect,
         elSandboxStatusBadge, elSandboxConnectionRow, elSandboxConnectionText,
-        elStripeCardSelect;
+        elStripeCardSelect,
+        elMonerisCardSelect, elMonerisCardRow,
+        // Moneris iPP320 virtual display
+        elMonerisScreenLine1, elMonerisScreenLine2,
+        elMonerisPairingToken, elMonerisDisplaySection;
 
     // ─── Reason messages sent back to the POS form ───────────────────────────
     const REASON_MESSAGES = {
@@ -123,6 +127,11 @@
         _refreshButtonState();
         _updateBadge();
 
+        // Update Moneris virtual screen to show "processing" state
+        if (state.activeBrand === 'moneris') {
+            _updateMonerisScreen('Processing...', 'Please Wait');
+        }
+
         // Auto-pulse the Terminal tab to get the operator's attention
         const terminalTabBtn = document.querySelector('[data-tab="terminal"]');
         if (terminalTabBtn) {
@@ -159,6 +168,13 @@
         elSandboxConnectionRow  = document.getElementById('sandbox-connection-row');
         elSandboxConnectionText = document.getElementById('sandbox-connection-text');
         elStripeCardSelect      = document.getElementById('stripe-test-card-select');
+        // Moneris-specific
+        elMonerisCardSelect     = document.getElementById('moneris-test-card-select');
+        elMonerisCardRow        = document.getElementById('moneris-card-row');
+        elMonerisDisplaySection = document.getElementById('moneris-display-section');
+        elMonerisScreenLine1    = document.getElementById('moneris-screen-line1');
+        elMonerisScreenLine2    = document.getElementById('moneris-screen-line2');
+        elMonerisPairingToken   = document.getElementById('moneris-pairing-token');
     }
 
     function _bindEvents() {
@@ -220,9 +236,10 @@
         if (el) el.addEventListener('click', handler);
     }
 
-    /** Show/hide brand-specific buttons based on active brand */
+    /** Show/hide brand-specific buttons and UI based on active brand */
     function _updateBrandVisibility() {
         const brand = state.activeBrand;
+
         // Partial auth: Stripe, Square, Helcim support it
         const supportsPartial = ['stripe', 'square', 'helcim', 'chase'].includes(brand);
         if (elBtnPartialAuth) elBtnPartialAuth.style.display = supportsPartial ? '' : 'none';
@@ -234,6 +251,34 @@
 
         // Swipe: all brands support it
         if (elBtnSwipeApproved) elBtnSwipeApproved.style.display = '';
+
+        // Moneris virtual display + card selector (only when Moneris selected)
+        const isMoneris = brand === 'moneris';
+        if (elMonerisDisplaySection) elMonerisDisplaySection.style.display = isMoneris ? '' : 'none';
+        if (elMonerisCardRow)        elMonerisCardRow.style.display        = isMoneris ? '' : 'none';
+
+        // Stripe card row: only for Stripe
+        const stripeCardRow = document.getElementById('stripe-card-row');
+        if (stripeCardRow) stripeCardRow.style.display = brand === 'stripe' ? '' : 'none';
+
+        // Generate a pairing token when Moneris is first selected
+        if (isMoneris && elMonerisPairingToken && !elMonerisPairingToken.textContent) {
+            elMonerisPairingToken.textContent = _generatePairingToken();
+        }
+    }
+
+    /** Generate a 9-character alphanumeric Moneris Cloud pairing token */
+    function _generatePairingToken() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Moneris-style: no O,0,I,1
+        let token = '';
+        for (let i = 0; i < 9; i++) token += chars[Math.floor(Math.random() * chars.length)];
+        return token;
+    }
+
+    /** Update the Moneris iPP320 virtual screen */
+    function _updateMonerisScreen(line1, line2 = '') {
+        if (elMonerisScreenLine1) elMonerisScreenLine1.textContent = line1;
+        if (elMonerisScreenLine2) elMonerisScreenLine2.textContent = line2;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -372,34 +417,53 @@
             // ── Moneris ──────────────────────────────────────────────────────
             case 'moneris': {
                 const transId = _numStr(13);
+                const transDate = new Date().toISOString().slice(0, 10);         // YYYY-MM-DD
+                const transTime = new Date().toTimeString().slice(0, 8);         // HH:MM:SS
 
-                // Moneris response codes: <50 = approved, ≥50 = declined
-                // 027 = approved, 400 = expired, 402 = stolen, 478 = CVD mismatch, 481 = declined, 914 = timeout
-                const monerisCode = isApproved || isPartial ? '027'
-                    : isTimeout     ? '914'
+                // Moneris response codes (§4 of implementation plan):
+                //   027 = Approved
+                //   101 = System Timeout (host unreachable — mpgHttpsPostStatus retry scenario)
+                //   400 = Expired card
+                //   402 = Stolen card
+                //   475 = Processing error
+                //   478 = CVD mismatch
+                //   481 = Standard decline (NSF)
+                //   914 = Terminal timeout (customer did not interact)
+                const monerisCode = (isApproved || isPartial) ? '027'
+                    : isTimeout ? '101'          // System Timeout — triggers status-check flow
                     : { nsf: '481', stolen: '402', expired: '400', cvc: '478', processing_error: '475' }[method] ?? '481';
 
-                const monerisMsg = isApproved || isPartial ? 'APPROVED'
-                    : isTimeout ? 'TIMEOUT'
+                const monerisMsg = (isApproved || isPartial) ? 'APPROVED *'
+                    : isTimeout ? 'SYSTEM TIMEOUT'
                     : { nsf: 'DECLINED', stolen: 'PICK UP CARD', expired: 'EXPIRED CARD', cvc: 'CVD FAILURE', processing_error: 'SYSTEM ERROR' }[method] ?? 'DECLINED';
 
-                // AVS and CVD results (for approved transactions)
-                const avsResult = (isApproved || isPartial) ? 'Y' : null;  // Full match
-                const cvdResult = (isApproved || isPartial) ? '1' : (method === 'cvc' ? '2' : null); // 1=match, 2=mismatch
+                // AVS result codes: Y=full match, N=no match, null=not checked
+                const avsResultCode = (isApproved || isPartial) ? 'Y' : 'N';
+                // CVD result codes: 1=match, 2=mismatch, 3=not verified
+                const cvdResultCode = (method === 'cvc') ? '2'
+                    : (isApproved || isPartial)           ? '1'
+                    : '3';
 
                 return {
-                    ResponseCode:  monerisCode,
-                    Message:       monerisMsg,
-                    TransID:       transId,
-                    ReferenceNum:  '66012345' + _numStr(10), // 8-char terminal ID prefix
-                    CardType:      'V',
-                    txn_num:       transId,
-                    ApprovalCode:  (isApproved || isPartial) ? _numStr(6) : null,
-                    ticket:        _uid('T', 8).toUpperCase(),
-                    iso_code:      (isApproved || isPartial) ? '00' : (isTimeout ? '68' : '05'),
-                    receipt_id:    _uid('R', 12).toUpperCase(),
-                    AvsResult:     avsResult,
-                    CvdResult:     cvdResult,
+                    // Fields mapped by MonerisForm.vue
+                    ResponseCode:     monerisCode,
+                    Message:          monerisMsg,
+                    TransID:          transId,
+                    ReceiptId:        'REC-' + _numStr(6) + '-' + _numStr(4),
+                    ReferenceNum:     '660' + _numStr(17),  // 20-char numeric reference
+                    CardType:         'V',                  // V=Visa, M=MC, AX=Amex
+                    txn_num:          transId,
+                    ApprovalCode:     (isApproved || isPartial) ? _numStr(6) : null,
+                    Ticket:           _uid('T', 8).toUpperCase(),
+                    iso_code:         (isApproved || isPartial) ? '00' : (isTimeout ? '68' : '05'),
+                    AvsResultCode:    avsResultCode,
+                    CvdResultCode:    cvdResultCode,
+                    // Receipt fields — mapped by TerminalBridge → printing.js
+                    TransDate:        transDate,
+                    TransTime:        transTime,
+                    TransAmount:      parseFloat(req.amount).toFixed(2),
+                    Complete:         (isApproved || isPartial) ? 'true' : 'false',
+                    TimedOut:         isTimeout ? 'true' : 'false',
                     // Partial auth fields
                     requested_amount:  parseFloat(req.amount).toFixed(2),
                     authorized_amount: isPartial ? (partialCents / 100).toFixed(2) : parseFloat(req.amount).toFixed(2),
@@ -716,14 +780,16 @@
         const req = state.pendingRequests[0]; // peek — shift after dispatch
 
         // ── Stripe sandbox Push-to-Reader ─────────────────────────────────────
-        // When environment=sandbox and gateway=stripe, the backend already created
-        // a real PaymentIntent and pushed it to the simulated reader.
-        // We call stripe_simulate.php to present the selected test card,
-        // then use the real response as the vendorPayload.
         if (state.environment === 'sandbox' && req.gateway === 'stripe' && req.payment_intent_id && req.reader_id) {
             const cardNumber = _stripeCardForOutcome(outcome, method);
             _callStripeSimulate(req, cardNumber, outcome, method);
-            return; // _callStripeSimulate will shift+dispatch asynchronously
+            return;
+        }
+
+        // ── Moneris sandbox — real QA API call via moneris_simulate.php ───────
+        if (state.environment === 'sandbox' && req.gateway === 'moneris') {
+            _callMonerisSimulate(req, outcome, method);
+            return;
         }
 
         _dispatchResponse(outcome, method, req);
@@ -822,6 +888,89 @@
         });
     }
 
+    /**
+     * Call moneris_simulate.php with the selected test card, get a real Moneris QA
+     * API response, and dispatch it as the vendorPayload.
+     *
+     * Moneris QA test cards (store1 / yesguy / esqa.moneris.com):
+     *   4005550000000019  Visa — always approved
+     *   5454545454545454  MC   — always approved
+     *   4111111111111111  Visa — approved (standard test card)
+     * Decline outcomes are driven by expdate: 1100 triggers decline on QA.
+     */
+    function _callMonerisSimulate(req, outcome, method) {
+        const posOrigin = state.posOrigin || 'http://localhost:8000';
+
+        // Pick test card from the Engineer's Toolbar selector, or derive from outcome
+        let pan     = (elMonerisCardSelect && elMonerisCardSelect.value) ? elMonerisCardSelect.value : '4005550000000019';
+        let expdate = '2512'; // YYMM — valid future date → approved on QA
+
+        // Force a decline on QA by using expdate=1100 (past date) for decline outcomes
+        if (outcome === 'declined' || outcome === 'timeout') {
+            expdate = '1100';
+        }
+
+        fetch(`${posOrigin}/api/moneris_simulate.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount:   req.amount,
+                pan,
+                expdate,
+                order_id: req.orderId ?? ('SIM-' + Date.now()),
+            }),
+        })
+        .then(r => r.json())
+        .then(simResult => {
+            state.pendingRequests.shift();
+
+            const vendorPayload = simResult.data ?? _buildVendorPayload('moneris', outcome, method, req);
+            const realOutcome   = simResult.outcome ?? outcome;
+
+            const payload = {
+                type:          'TERMINAL_SIMULATE_RESPONSE',
+                requestId:     req.id,
+                outcome:       realOutcome,
+                method,
+                reference:     simResult.transaction_id ?? ('moneris_' + Date.now()),
+                gateway:       req.gateway,
+                brand:         'moneris',
+                timestamp:     new Date().toISOString(),
+                vendorPayload,
+            };
+
+            if (realOutcome !== 'approved') {
+                payload.reason = simResult.message ?? REASON_MESSAGES[method] ?? 'Card declined.';
+            }
+
+            if (state.swPort) state.swPort.postMessage(payload);
+
+            _updateMonerisScreenForOutcome(realOutcome);
+            _markLogEntryResolved(req.id, realOutcome, method);
+            _refreshButtonState();
+            _updateBadge();
+        })
+        .catch(err => {
+            console.error('[TerminalSim] moneris_simulate.php failed, falling back to mock:', err);
+            state.pendingRequests.shift();
+            _dispatchResponseDirect(outcome, method, req);
+        });
+    }
+
+    /** Update the Moneris screen after a response is resolved */
+    function _updateMonerisScreenForOutcome(outcome) {
+        if (outcome === 'approved') {
+            _updateMonerisScreen('APPROVED', 'Remove Card');
+            setTimeout(() => _updateMonerisScreen('Moneris', 'Welcome'), 3000);
+        } else if (outcome === 'timeout') {
+            _updateMonerisScreen('SYSTEM TIMEOUT', 'Please Retry');
+            setTimeout(() => _updateMonerisScreen('Moneris', 'Welcome'), 4000);
+        } else {
+            _updateMonerisScreen('DECLINED', 'See Attendant');
+            setTimeout(() => _updateMonerisScreen('Moneris', 'Welcome'), 3000);
+        }
+    }
+
     function _dispatchResponse(outcome, method, req) {
         state.pendingRequests.shift();
         _dispatchResponseDirect(outcome, method, req);
@@ -863,6 +1012,7 @@
             console.error('[TerminalSim] SW port not available — cannot send response.');
         }
 
+        if (state.activeBrand === 'moneris') _updateMonerisScreenForOutcome(outcome);
         _markLogEntryResolved(req.id, outcome, method);
         _refreshButtonState();
         _updateBadge();
