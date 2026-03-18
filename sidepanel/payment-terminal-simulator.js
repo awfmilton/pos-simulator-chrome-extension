@@ -109,24 +109,247 @@
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Vendor-accurate response payload builder
+    // ─────────────────────────────────────────────────────────────────────────
+    function _uid(prefix, len) {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let s = prefix;
+        for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+        return s;
+    }
+    function _numStr(len) {
+        let s = '';
+        for (let i = 0; i < len; i++) s += Math.floor(Math.random() * 10);
+        return s;
+    }
+
+    function _buildVendorPayload(brand, outcome, method, req) {
+        const isApproved = outcome === 'approved';
+        const amountCents = Math.round(parseFloat(req.amount) * 100);
+        const maskedPan   = '4111 **** **** ' + _numStr(4);
+        const now         = new Date().toISOString();
+
+        switch (brand) {
+            // ── Stripe ─────────────────────────────────────────────────────
+            case 'stripe': {
+                const piId = _uid('pi_', 24);
+                return isApproved ? {
+                    id: piId,
+                    object: 'payment_intent',
+                    status: 'succeeded',
+                    amount: amountCents,
+                    currency: (req.currency || 'CAD').toLowerCase(),
+                    payment_method: _uid('pm_', 24),
+                    charges: {
+                        data: [{
+                            id: _uid('ch_', 24),
+                            paid: true,
+                            amount: amountCents,
+                            payment_method_details: {
+                                type: method === 'tap' ? 'card_present' : 'card',
+                                card_present: { brand: 'visa', last4: maskedPan.slice(-4), exp_month: 12, exp_year: 2027, read_method: method === 'tap' ? 'contactless_emv' : 'contact_emv' }
+                            }
+                        }]
+                    },
+                    created: Math.floor(Date.now() / 1000)
+                } : {
+                    id: piId,
+                    object: 'payment_intent',
+                    status: outcome === 'timeout' ? 'canceled' : 'requires_payment_method',
+                    last_payment_error: {
+                        code: outcome === 'timeout' ? 'payment_intent_timeout' : 'card_declined',
+                        decline_code: outcome === 'timeout' ? null : 'insufficient_funds',
+                        message: outcome === 'timeout' ? 'The operation timed out.' : 'Your card has insufficient funds.'
+                    }
+                };
+            }
+
+            // ── Moneris ────────────────────────────────────────────────────
+            case 'moneris': {
+                const transId = _numStr(13);
+                return {
+                    ResponseCode:  isApproved ? '027' : outcome === 'timeout' ? '914' : '481',
+                    Message:       isApproved ? 'APPROVED' : outcome === 'timeout' ? 'TIMEOUT' : 'DECLINED',
+                    TransID:       transId,
+                    ReferenceNum:  _numStr(12),
+                    CardType:      'V',
+                    txn_num:       transId,
+                    ApprovalCode:  isApproved ? _numStr(6) : null,
+                    ticket:        _uid('T', 8).toUpperCase(),
+                    iso_code:      isApproved ? '00' : '05',
+                    receipt_id:    _uid('R', 12).toUpperCase(),
+                };
+            }
+
+            // ── Square ─────────────────────────────────────────────────────
+            case 'square': {
+                const payId = _uid('', 32).toUpperCase();
+                return {
+                    payment: {
+                        id: payId,
+                        status: isApproved ? 'COMPLETED' : outcome === 'timeout' ? 'CANCELED' : 'FAILED',
+                        amount_money: { amount: amountCents, currency: (req.currency || 'CAD') },
+                        card_details: {
+                            status: isApproved ? 'CAPTURED' : 'FAILED',
+                            card: { card_brand: 'VISA', last_4: maskedPan.slice(-4), exp_month: 12, exp_year: 2027, fingerprint: _uid('sq_fp_', 16) },
+                            entry_method: method === 'tap' ? 'CONTACTLESS' : 'CHIP',
+                            avs_status: isApproved ? 'AVS_MATCHED' : null,
+                        },
+                        location_id: _uid('L', 13).toUpperCase(),
+                        order_id:    _uid('', 32).toUpperCase(),
+                        created_at:  now,
+                        updated_at:  now,
+                        receipt_url: isApproved ? `https://squareup.com/receipt/preview/${payId}` : null,
+                        errors: isApproved ? [] : [{ category: 'PAYMENT_METHOD_ERROR', code: outcome === 'timeout' ? 'PAYMENT_LIMIT_EXCEEDED' : 'CARD_DECLINED', detail: outcome === 'timeout' ? 'Terminal timed out.' : 'Insufficient funds.' }],
+                    }
+                };
+            }
+
+            // ── Helcim ─────────────────────────────────────────────────────
+            case 'helcim': {
+                return {
+                    response: isApproved ? 1 : 0,
+                    responseMessage: isApproved ? 'APPROVED' : outcome === 'timeout' ? 'TIMEOUT' : 'DECLINED',
+                    data: {
+                        transactionId:  parseInt(_numStr(8)),
+                        dateCreated:    now,
+                        approvalCode:   isApproved ? _numStr(6) : null,
+                        cardType:       'visa',
+                        cardNumber:     maskedPan,
+                        cardExpiry:     '12/27',
+                        currency:        req.currency || 'CAD',
+                        amount:          parseFloat(req.amount),
+                        avsResponse:     isApproved ? 'X' : null,
+                        cvvResponse:     isApproved ? 'M' : null,
+                        invoice:         req.id,
+                        terminalId:      _uid('HT', 6).toUpperCase(),
+                    }
+                };
+            }
+
+            // ── Elavon / Converge ──────────────────────────────────────────
+            case 'elavon': {
+                return {
+                    ssl_result:       isApproved ? '0' : '1',
+                    ssl_result_message: isApproved ? 'APPROVAL' : outcome === 'timeout' ? 'TIMEOUT' : 'DECLINE',
+                    ssl_txn_id:       _numStr(16),
+                    ssl_approval_code: isApproved ? _numStr(6) : null,
+                    ssl_card_type:    'VISA',
+                    ssl_card_number:  maskedPan,
+                    ssl_exp_date:     '1227',
+                    ssl_amount:       parseFloat(req.amount).toFixed(2),
+                    ssl_salestax:     '0.00',
+                    ssl_invoice_number: req.id,
+                    ssl_avs_response: isApproved ? 'X' : null,
+                    ssl_cvv2_response: isApproved ? 'M' : null,
+                    ssl_txn_time:     now,
+                    errorCode:        isApproved ? null : (outcome === 'timeout' ? 'E00013' : 'E00012'),
+                    errorName:        isApproved ? null : (outcome === 'timeout' ? 'Timeout' : 'Declined'),
+                    errorMessage:     isApproved ? null : (outcome === 'timeout' ? 'Terminal timed out.' : 'Insufficient funds.'),
+                };
+            }
+
+            // ── Global Payments ────────────────────────────────────────────
+            case 'globalpayments': {
+                return {
+                    id:           _uid('txn_', 20),
+                    result:       isApproved ? 'SUCCESS' : outcome === 'timeout' ? 'TIMEOUT' : 'DECLINED',
+                    status:       isApproved ? 'CAPTURED' : 'FAILED',
+                    amount:       parseFloat(req.amount).toFixed(2),
+                    currency:     req.currency || 'CAD',
+                    batchNumber:  _numStr(6),
+                    card: {
+                        maskedNumber:  maskedPan,
+                        expiry:        '1227',
+                        cardholderName: 'TEST CARDHOLDER',
+                        brand:         'VISA',
+                        authCode:       isApproved ? _numStr(6) : null,
+                        entryMethod:    method === 'tap' ? 'CONTACTLESS' : 'CHIP',
+                    },
+                    responseCode:  isApproved ? '00' : (outcome === 'timeout' ? '68' : '05'),
+                    responseMessage: isApproved ? 'Approved' : (outcome === 'timeout' ? 'Timeout' : 'Do Not Honour'),
+                    timestamp:     now,
+                };
+            }
+
+            // ── Chase / CyberSource OmniPay ────────────────────────────────
+            case 'chase': {
+                return {
+                    decision:    isApproved ? 'ACCEPT' : outcome === 'timeout' ? 'ERROR' : 'DECLINE',
+                    requestID:   _numStr(20),
+                    requestToken: _uid('Axj', 40),
+                    reasonCode:  isApproved ? '100' : outcome === 'timeout' ? '150' : '481',
+                    purchaseTotals: {
+                        currency: req.currency || 'CAD',
+                        grandTotalAmount: parseFloat(req.amount).toFixed(2),
+                    },
+                    ccAuthReply: {
+                        reasonCode:   isApproved ? '100' : '481',
+                        amount:       parseFloat(req.amount).toFixed(2),
+                        authorizationCode: isApproved ? _numStr(6) : null,
+                        avsCode:      isApproved ? 'Y' : null,
+                        cvCode:       isApproved ? 'M' : null,
+                        authorizedDateTime: now,
+                        processorResponse: isApproved ? '00' : '05',
+                    },
+                };
+            }
+
+            // ── PayPal / Zettle ────────────────────────────────────────────
+            case 'paypal': {
+                return {
+                    uuid:         _uid('', 32),
+                    state:        isApproved ? 'PAID' : outcome === 'timeout' ? 'FAILED' : 'FAILED',
+                    type:         'PAYMENT',
+                    amount: {
+                        value:        parseFloat(req.amount).toFixed(2),
+                        currencyId:   req.currency || 'CAD',
+                    },
+                    cardPayment: {
+                        maskedPan,
+                        cardType:      'VISA',
+                        entryMode:     method === 'tap' ? 'CONTACTLESS' : 'CHIP',
+                        statusMessage: isApproved ? 'APPROVED' : 'DECLINED',
+                        authorizationCode: isApproved ? _numStr(6) : null,
+                    },
+                    references: {
+                        paymentReference: req.id,
+                        receiptReference: isApproved ? _uid('R', 12).toUpperCase() : null,
+                    },
+                    errorMessage: isApproved ? null : (outcome === 'timeout' ? 'Payment terminal timed out.' : 'Payment declined due to insufficient funds.'),
+                    timestamp: now,
+                };
+            }
+
+            // ── Fallback ───────────────────────────────────────────────────
+            default:
+                return { outcome, reference, timestamp: now };
+        }
+    }
+
     function _sendResponse(outcome, method) {
         if (state.pendingRequests.length === 0) {
             console.warn('[TerminalSim] No pending requests to respond to.');
             return;
         }
 
-        const req = state.pendingRequests.shift(); // Serve oldest request first
-        const reference = `${state.activeBrand}_${method}_${Date.now()}`;
+        const req       = state.pendingRequests.shift(); // Serve oldest request first
+        const brand     = state.activeBrand;
+        const reference = `${brand}_${method}_${Date.now()}`;
+
+        const vendorPayload = _buildVendorPayload(brand, outcome, method, req);
 
         const payload = {
-            type:      'TERMINAL_SIMULATE_RESPONSE',
-            requestId: req.id,
+            type:          'TERMINAL_SIMULATE_RESPONSE',
+            requestId:     req.id,
             outcome,
             method,
             reference,
-            gateway:   req.gateway,
-            brand:     state.activeBrand,
-            timestamp: new Date().toISOString(),
+            gateway:       req.gateway,
+            brand,
+            timestamp:     new Date().toISOString(),
+            vendorPayload, // ← vendor-accurate response shape
         };
 
         if (outcome !== 'approved') {
