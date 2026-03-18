@@ -2026,3 +2026,81 @@ input:checked + .slider:before {
     background: linear-gradient(135deg, #000000 0%, #ff9900 100%);
     border-radius: 20px;
 }
+
+/* ── Engineer's Toolbar ──────────────────────────────────────── */
+.engineer-toolbar {
+    background: #1e1e2e;
+    border: 1px solid #3b3b5c;
+    border-radius: var(--border-radius);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    color: #cdd6f4;
+}
+
+.engineer-toolbar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #a6e3a1;
+}
+
+.engineer-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.engineer-toolbar-row label,
+.engineer-toolbar-row span {
+    color: #bac2de;
+    white-space: nowrap;
+    font-size: 0.78rem;
+}
+
+.engineer-toolbar-row select {
+    background: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.78rem;
+}
+
+.engineer-toolbar .stripe-test-amount-btn {
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    background: #313244;
+    color: #89b4fa;
+    border-color: #45475a;
+}
+
+.engineer-toolbar .stripe-test-amount-btn:hover {
+    background: #45475a;
+}
+
+/* Sandbox mode badge */
+.sandbox-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.sandbox-badge.mock {
+    background: #45475a;
+    color: #9399b2;
+}
+
+.sandbox-badge.sandbox {
+    background: #a6e3a1;
+    color: #1e3a2e;
+}
