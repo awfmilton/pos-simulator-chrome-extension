@@ -357,12 +357,18 @@ class POSSimulatorPanel {
 
         this.port.onMessage.addListener((msg) => this.handlePortMessage(msg));
         this.port.onDisconnect.addListener(() => {
-            console.warn('[PANEL] Disconnected from service worker.');
+            console.warn('[PANEL] Disconnected from service worker. Reconnecting in 1s...');
             this.port = null;
             if (this.keepAliveInterval) {
                 clearInterval(this.keepAliveInterval);
+                this.keepAliveInterval = null;
+            }
+            if (this.checkConnectionInterval) {
+                clearInterval(this.checkConnectionInterval);
+                this.checkConnectionInterval = null;
             }
             this.updateConnectionStatus(false, null);
+            setTimeout(() => this.connectToServiceWorker(), 1000);
         });
 
         // Start a heartbeat to keep the service worker alive
@@ -371,7 +377,7 @@ class POSSimulatorPanel {
         }, 20000); // 20 seconds
 
         // Check connection status every 5 seconds
-        setInterval(() => this.sendMessage('CHECK_CONNECTION'), 5000);
+        this.checkConnectionInterval = setInterval(() => this.sendMessage('CHECK_CONNECTION'), 5000);
 
         // Initialise the payment terminal simulator module with the SW port
         if (typeof window.initPaymentTerminalSimulator === 'function') {

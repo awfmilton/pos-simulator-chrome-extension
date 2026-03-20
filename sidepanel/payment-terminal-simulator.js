@@ -81,8 +81,16 @@
      * Called by panel.js when a TERMINAL_CHARGE_REQUEST message arrives from SW.
      */
     window.handleTerminalChargeRequest = function (data) {
+        const reqId = data.requestId ?? ('req_' + Date.now());
+
+        // Deduplicate: ignore retries for a requestId already in the queue
+        if (state.pendingRequests.some(r => r.id === reqId)) {
+            console.log('[TerminalSim] Duplicate requestId ignored:', reqId);
+            return;
+        }
+
         const req = {
-            id:               data.requestId ?? ('req_' + Date.now()),
+            id:               reqId,
             gateway:          data.gateway ?? 'unknown',
             amount:           typeof data.amount === 'number' ? data.amount.toFixed(2) : data.amount,
             currency:         data.currency ?? 'CAD',
