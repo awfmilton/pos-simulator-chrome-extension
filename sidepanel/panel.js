@@ -394,6 +394,10 @@ class POSSimulatorPanel {
                 break;
             case 'CONNECTION_STATUS':
                 this.updateConnectionStatus(msg.data.connected, msg.data.url);
+                // When the POS page closes, synthesize a disconnect to revert the terminal light
+                if (!msg.data.connected && typeof window.handleTerminalReadySignal === 'function') {
+                    window.handleTerminalReadySignal({ enabled: false, brand: null, debug: false, terminalIp: null });
+                }
                 break;
             case 'PRINT_DATA_RECEIVED':
                 // Pass brand to the handler for correct parsing
@@ -421,6 +425,14 @@ class POSSimulatorPanel {
                     window.handleTerminalChargeRequest(msg);
                 } else {
                     console.warn('[PANEL] handleTerminalChargeRequest not found — payment-terminal-simulator.js may not have loaded.');
+                }
+                break;
+            case 'TERMINAL_READY_SIGNAL':
+                // POS settings changed (enabled, brand, IP). Update the connection light.
+                if (typeof window.handleTerminalReadySignal === 'function') {
+                    window.handleTerminalReadySignal(msg);
+                } else {
+                    console.warn('[PANEL] handleTerminalReadySignal not found — payment-terminal-simulator.js may not have loaded.');
                 }
                 break;
         }

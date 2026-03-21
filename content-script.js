@@ -117,6 +117,25 @@ class POSContentScript {
                     this.port.postMessage({ type: 'TERMINAL_CHARGE_CANCEL', timestamp: event.data.timestamp });
                 }
             }
+
+            // ── Terminal Bridge: POS ready / handshake signal ────────────────
+            // Sent by TerminalConnectionCard whenever settings change, and by
+            // BaseTerminalBridge on initial load.  Forwarded to the extension
+            // side panel so it can update the connection status light.
+            if (t === 'POS_TERMINAL_READY') {
+                console.log('[CS] Forwarding POS_TERMINAL_READY to SW:', event.data);
+                if (this.port) {
+                    this.port.postMessage({
+                        type:       'TERMINAL_READY_SIGNAL',
+                        enabled:    event.data.enabled,
+                        brand:      event.data.brand,
+                        debug:      event.data.debug,
+                        terminalIp: event.data.terminalIp,
+                    });
+                } else {
+                    console.warn('[CS] Cannot forward POS_TERMINAL_READY — not connected to SW.');
+                }
+            }
         }, false);
     }
 
