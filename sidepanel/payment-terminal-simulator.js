@@ -36,6 +36,8 @@
         posOrigin: 'http://localhost:8000',  // POS server origin for stripe_simulate.php calls
         gearClickCount: 0,      // triple-click counter to reveal toolbar
         gearClickTimer: null,
+        virtualIp: null,        // assigned on init from chrome.storage.local
+        posHandshakeValid: false, // true when POS IP matches virtualIp and enabled=true
     };
 
     // ─── DOM references ──────────────────────────────────────────────────────
@@ -54,7 +56,9 @@
         elMonerisCardSelect, elMonerisCardRow,
         // Moneris iPP320 virtual display
         elMonerisScreenLine1, elMonerisScreenLine2,
-        elMonerisPairingToken, elMonerisDisplaySection;
+        elMonerisPairingToken, elMonerisDisplaySection,
+        // Virtual IP display and terminal status light
+        elVirtualIpSpan, elTerminalStatus;
 
     // ─── Reason messages sent back to the POS form ───────────────────────────
     const REASON_MESSAGES = {
@@ -72,10 +76,24 @@
     // ─────────────────────────────────────────────────────────────────────────
     window.initPaymentTerminalSimulator = function (swPort) {
         state.swPort = swPort;
-        _cacheDOM();
-        _bindEvents();
-        _refreshButtonState();
-        console.log('[TerminalSim] Initialized.');
+
+        // Load or generate a persistent virtual IP for this simulator instance.
+        // chrome.storage.local is used so the same IP survives panel reloads.
+        chrome.storage.local.get('terminalVirtualIp', function (result) {
+            if (result.terminalVirtualIp) {
+                state.virtualIp = result.terminalVirtualIp;
+            } else {
+                // Generate a random address in 192.168.100.2–254
+                const octet = Math.floor(Math.random() * 253) + 2;
+                state.virtualIp = '192.168.100.' + octet;
+                chrome.storage.local.set({ terminalVirtualIp: state.virtualIp });
+            }
+            _cacheDOM();
+            _bindEvents();
+            _refreshButtonState();
+            _renderVirtualIp();
+            console.log('[TerminalSim] Initialized. Virtual IP:', state.virtualIp);
+        });
     };
 
     /**
@@ -161,9 +179,63 @@
         }
     };
 
+    /**
+     * Called by panel.js when a TERMINAL_READY_SIGNAL message arrives from the SW.
+     * Updates the connection status light based on whether the POS's configured IP
+     * matches this simulator's assigned virtual IP and the terminal is enabled.
+     *
+     * @param {object} data - { enabled, brand, debug, terminalIp }
+     */
+    window.handleTerminalReadySignal = function (data) {
+        const ipMatch     = !!(data.terminalIp && data.terminalIp === state.virtualIp);
+        const shouldConnect = !!(data.enabled && ipMatch);
+
+        state.posHandshakeValid = shouldConnect;
+
+        // Update the terminal status light in the panel header
+        if (elTerminalStatus) {
+            if (shouldConnect) {
+                elTerminalStatus.classList.add('connected');
+            } else {
+                elTerminalStatus.classList.remove('connected');
+            }
+        }
+
+        // Sync brand from POS settings so the simulator stays in step
+        if (data.brand && data.brand !== state.activeBrand) {
+            state.activeBrand = data.brand;
+            if (elBrandSelect) elBrandSelect.value = data.brand;
+            _updateBrandVisibility();
+        }
+
+        // Sync debug flag from POS settings
+        if (typeof data.debug === 'boolean') {
+            state.debug = data.debug;
+            window.TerminalSimulatorDebug = data.debug;
+        }
+
+        if (state.debug) {
+            console.log('[TerminalSim] handleTerminalReadySignal:', {
+                receivedIp:    data.terminalIp,
+                virtualIp:     state.virtualIp,
+                ipMatch,
+                enabled:       data.enabled,
+                shouldConnect,
+            });
+        }
+    };
+
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    /** Writes the assigned virtual IP to the display span in the terminal panel. */
+    function _renderVirtualIp() {
+        if (elVirtualIpSpan && state.virtualIp) {
+            elVirtualIpSpan.textContent = state.virtualIp;
+        }
+    }
+
     function _cacheDOM() {
         elBrandSelect           = document.getElementById('terminal-brand-select');
         elLogList               = document.getElementById('terminal-log-list');
@@ -196,6 +268,9 @@
         elMonerisScreenLine1    = document.getElementById('moneris-screen-line1');
         elMonerisScreenLine2    = document.getElementById('moneris-screen-line2');
         elMonerisPairingToken   = document.getElementById('moneris-pairing-token');
+        // Virtual IP display and terminal status light
+        elVirtualIpSpan         = document.getElementById('terminal-virtual-ip');
+        elTerminalStatus        = document.getElementById('terminal-status');
     }
 
     function _bindEvents() {

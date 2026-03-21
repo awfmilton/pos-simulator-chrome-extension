@@ -91,6 +91,21 @@ class PeripheralSimulatorService {
                 if (this.sidePanelPort) {
                     this.sidePanelPort.postMessage({ type: 'TERMINAL_CHARGE_CANCEL' });
                 }
+            } else if (msg.type === 'TERMINAL_READY_SIGNAL') {
+                // POS settings changed (terminal enabled/disabled, brand, IP).
+                // Relay to the side panel so it can update the connection light.
+                console.log('[SW] TERMINAL_READY_SIGNAL received from content script:', msg);
+                if (this.sidePanelPort) {
+                    this.sidePanelPort.postMessage({
+                        type:       'TERMINAL_READY_SIGNAL',
+                        enabled:    msg.enabled,
+                        brand:      msg.brand,
+                        debug:      msg.debug,
+                        terminalIp: msg.terminalIp,
+                    });
+                } else {
+                    console.warn('[SW] No side panel connected — cannot deliver TERMINAL_READY_SIGNAL.');
+                }
             } else {
                 console.warn(`[SW] Unrecognized message type from content script: ${msg.type}`);
             }
