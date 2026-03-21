@@ -26,6 +26,15 @@ window.TerminalSimulators.stripe = (function () {
     function buildPayload(outcome, method, req, partialPercent) {
         const { uid, numStr, amountCents, partialCents } = window.TerminalSimulatorHelpers;
 
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Stripe] buildPayload called', {
+                payment_intent_id: req.payment_intent_id ?? null,
+                outcome, method,
+                amount: req.amount,
+                currency: req.currency,
+            });
+        }
+
         const isApproved    = outcome === 'approved';
         const isPartial     = outcome === 'partial_auth';
         const isTimeout     = outcome === 'timeout';
@@ -44,7 +53,7 @@ window.TerminalSimulators.stripe = (function () {
                 : method === 'insert'             ? 'contact_emv'
                 : 'contactless_emv';
 
-            return {
+            const approvedPayload = {
                 id: piId,
                 object: 'payment_intent',
                 status: isPartial ? 'requires_capture' : 'succeeded',
@@ -90,6 +99,10 @@ window.TerminalSimulators.stripe = (function () {
                 },
                 created: now,
             };
+            if (window.TerminalSimulatorDebug) {
+                console.log('[TerminalSim][Stripe] Approved payload built', { piId, chId, readMethod, authorizedCents });
+            }
+            return approvedPayload;
         }
 
         // Decline / timeout
@@ -107,6 +120,9 @@ window.TerminalSimulators.stripe = (function () {
             processing_error: 'processing_error',
         }[method] ?? (isTimeout ? 'payment_intent_timeout' : 'card_declined');
 
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Stripe] Decline payload built', { piId, stripeDeclineCode, stripeErrorCode });
+        }
         return {
             id: piId,
             object: 'payment_intent',

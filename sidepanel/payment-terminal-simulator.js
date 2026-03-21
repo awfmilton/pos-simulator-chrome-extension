@@ -146,6 +146,11 @@
         // Update Moneris virtual screen to show "processing" state
         if (state.activeBrand === 'moneris') {
             _updateMonerisScreen('Processing...', 'Please Wait');
+            if (state.debug) {
+                console.log('[TerminalSim][Moneris] iPP320 screen transition → Processing...', {
+                    reqId: req.id, amount: req.amount,
+                });
+            }
         }
 
         // Auto-pulse the Terminal tab to get the operator's attention
@@ -497,6 +502,9 @@
 
     /** Update the Moneris screen after a response is resolved */
     function _updateMonerisScreenForOutcome(outcome) {
+        if (state.debug) {
+            console.log('[TerminalSim][Moneris] iPP320 screen transition → outcome:', outcome);
+        }
         if (outcome === 'approved') {
             _updateMonerisScreen('APPROVED', 'Remove Card');
             setTimeout(() => _updateMonerisScreen('Moneris', 'Welcome'), 3000);

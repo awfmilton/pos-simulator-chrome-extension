@@ -39,17 +39,32 @@ window.TerminalSimulators.helcim = (function () {
 
         const approvedAmount = isPartial ? (pCents / 100) : parseFloat(req.amount);
 
+        const transactionId = parseInt(numStr(8));
+        const approvalCode  = (isApproved || isPartial) ? numStr(6) : null;
+        const cardToken     = (isApproved || isPartial) ? uid('helcim_tok_', 16) : null;
+
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Helcim] Generated IDs', {
+                transactionId,
+                approvalCode,
+                cardToken,
+                maskedPan,
+                outcome,
+                method,
+            });
+        }
+
         return {
             response:        (isApproved || isPartial) ? 1 : 0,
             responseMessage: helcimMsg,
             data: {
-                transactionId:   parseInt(numStr(8)),
+                transactionId,
                 dateCreated:     now,
-                approvalCode:    (isApproved || isPartial) ? numStr(6) : null,
+                approvalCode,
                 cardType:        'visa',
                 cardNumber:      maskedPan,
                 cardExpiry:      '12/27',
-                cardToken:       (isApproved || isPartial) ? uid('helcim_tok_', 16) : null,
+                cardToken,
                 currency:        req.currency || 'CAD',
                 amount:          approvedAmount,
                 requestedAmount: parseFloat(req.amount),

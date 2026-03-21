@@ -62,6 +62,22 @@ window.TerminalSimulators.square = (function () {
         const entryMethod = method === 'swipe' ? 'SWIPED' : method === 'insert' ? 'CHIP' : 'CONTACTLESS';
         const payId = uid('', 32).toUpperCase();
 
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Square] buildPayload called', {
+                outcome, method, squareStatus, payId,
+                totalCents, pCents,
+            });
+        }
+
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Square] Payload built', {
+                status:      squareStatus,
+                cardStatus:  squareCardStatus,
+                entryMethod,
+                errorCode:   (isApproved || isNotCaptured || isPartial) ? null : squareErrorCode,
+            });
+        }
+
         return {
             payment: {
                 id: payId,

@@ -43,8 +43,23 @@ window.TerminalSimulators.paypal = (function () {
             : method === 'insert'            ? 'CHIP'
             : 'CONTACTLESS';
 
+        const uuid = uid('', 32);
+
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][PayPal/Zettle] EMV fields generated', {
+                uuid,
+                maskedPan,
+                entryMode,
+                state:             zettleState,
+                authorizationCode: (isApproved || isPartial) ? '(6-digit)' : null,
+                applicationId:     'A0000000031010',   // Visa Debit AID
+                tvr:               '0000000000',        // Terminal Verification Results
+                tsi:               'E800',              // Transaction Status Indicator
+            });
+        }
+
         return {
-            uuid:  uid('', 32),
+            uuid,
             state: zettleState,
             type:  'PAYMENT',
             amount: {
