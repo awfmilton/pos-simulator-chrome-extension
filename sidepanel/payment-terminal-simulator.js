@@ -32,6 +32,7 @@
         partialAuthPercent: 70, // percentage of amount to authorize for partial auth (default 70%)
         forceResult: '',        // Engineer's Toolbar: force next result ('approved'|'nsf'|'stolen'|'expired'|'cvc'|'timeout'|'')
         environment: 'mock',    // 'sandbox' | 'mock' — from incoming charge request
+        debug: false,           // mirrors POS terminal_debug_enabled flag
         posOrigin: 'http://localhost:8000',  // POS server origin for stripe_simulate.php calls
         gearClickCount: 0,      // triple-click counter to reveal toolbar
         gearClickTimer: null,
@@ -108,6 +109,13 @@
         }
         if (data.posOrigin) {
             state.posOrigin = data.posOrigin;
+        }
+        if (typeof data.debug === 'boolean') {
+            state.debug = data.debug;
+            window.TerminalSimulatorDebug = data.debug;
+            if (data.debug) {
+                console.log('[TerminalSim] Debug Mode Active — verbose logging enabled.');
+            }
         }
 
         // If a Force Result is set, auto-respond without operator interaction
@@ -287,6 +295,9 @@
      * @param {object} req             - the full pending request object (amount, currency, orderId, posOrigin, payment_intent_id, reader_id, …)
      */
     function _buildVendorPayload(brand, outcome, method, req) {
+        if (state.debug) {
+            console.log('[TerminalSim] _buildVendorPayload', { brand, outcome, method, req });
+        }
         const sim = window.TerminalSimulators?.[brand];
         if (!sim) {
             console.warn('[TerminalSim] No simulator registered for brand:', brand);
@@ -296,6 +307,9 @@
     }
 
     function _sendResponse(outcome, method) {
+        if (state.debug) {
+            console.log('[TerminalSim] _sendResponse called', { outcome, method, pendingCount: state.pendingRequests.length });
+        }
         if (state.pendingRequests.length === 0) {
             console.warn('[TerminalSim] No pending requests to respond to.');
             return;
