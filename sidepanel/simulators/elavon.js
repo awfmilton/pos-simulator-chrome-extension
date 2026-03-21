@@ -51,6 +51,17 @@ window.TerminalSimulators.elavon = (function () {
 
         const entryMode = method === 'swipe' ? 'SWIPE' : method === 'insert' ? 'CHIP' : 'CONTACTLESS';
 
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Elavon] ssl_ mapping', {
+                outcome,
+                method,
+                ssl_result:         elavonResult,
+                ssl_result_message: elavonMsg,
+                errorCode:          (isApproved || isPartial) ? null : elavonErrorCode,
+                entryMode,
+            });
+        }
+
         return {
             ssl_result:            elavonResult,
             ssl_result_message:    elavonMsg,

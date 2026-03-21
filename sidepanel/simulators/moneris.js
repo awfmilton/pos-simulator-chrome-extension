@@ -30,6 +30,9 @@ window.TerminalSimulators.moneris = (function () {
         // Generate a pairing token on first display (Moneris Cloud terminal pairing)
         if (show && pairingToken && !pairingToken.textContent) {
             pairingToken.textContent = _generatePairingToken();
+            if (window.TerminalSimulatorDebug) {
+                console.log('[TerminalSim][Moneris] Pairing token generated:', pairingToken.textContent);
+            }
         }
     }
 
@@ -75,6 +78,13 @@ window.TerminalSimulators.moneris = (function () {
         const transId   = numStr(13);
         const transDate = new Date().toISOString().slice(0, 10);
         const transTime = new Date().toTimeString().slice(0, 8);
+
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Moneris] Response code mapping', {
+                outcome, method, monerisCode, monerisMsg,
+                transId, ApprovalCode: (isApproved || isPartial) ? '(6-digit numStr)' : null,
+            });
+        }
 
         return {
             ResponseCode:     monerisCode,

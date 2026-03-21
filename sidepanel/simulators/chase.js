@@ -43,6 +43,16 @@ window.TerminalSimulators.chase = (function () {
             : (csReasonCode === '150' || csReasonCode === '151')              ? 'ERROR'
             : 'DECLINE';
 
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][Chase] CyberSource reason code mapping', {
+                outcome,
+                method,
+                csReasonCode,
+                csDecision,
+                authorizationCode: (isApproved || isPartial) ? '(6-digit)' : null,
+            });
+        }
+
         return {
             decision:      csDecision,
             requestID:     numStr(20),

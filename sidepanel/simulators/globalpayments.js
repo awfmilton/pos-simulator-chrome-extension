@@ -56,6 +56,18 @@ window.TerminalSimulators.globalpayments = (function () {
 
         const entryMode = method === 'swipe' ? 'SWIPE' : method === 'insert' ? 'CHIP' : 'CONTACTLESS';
 
+        if (window.TerminalSimulatorDebug) {
+            console.log('[TerminalSim][GlobalPayments] Response metadata', {
+                outcome,
+                method,
+                gpCode,
+                gpMsg,
+                gpResult,
+                authCode: (isApproved || isPartial || isNotCaptured) ? '(6-digit)' : null,
+                batchNumber: '(6-digit)',
+            });
+        }
+
         return {
             id:              uid('txn_', 20),
             result:          gpResult,
