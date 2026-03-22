@@ -1008,7 +1008,7 @@ class POSSimulatorPanel {
     // Theme Management Functions
     applyTheme(themeName) {
         // Remove all existing theme classes
-        const themeClasses = ['theme-default', 'theme-dark', 'theme-dos-green', 'theme-dos-red', 'theme-dos-white', 'theme-lcars', 'theme-futuristic'];
+        const themeClasses = ['theme-default', 'theme-dark', 'theme-dos-green', 'theme-dos-red', 'theme-dos-white', 'theme-lcars', 'theme-futuristic', 'theme-tbay'];
         document.body.classList.remove(...themeClasses);
         
         // Apply the selected theme
@@ -1027,7 +1027,7 @@ class POSSimulatorPanel {
         const previewText = preview.querySelector('.preview-text');
         
         // Reset preview classes
-        const themeClasses = ['theme-default', 'theme-dark', 'theme-dos-green', 'theme-dos-red', 'theme-dos-white', 'theme-lcars', 'theme-futuristic'];
+        const themeClasses = ['theme-default', 'theme-dark', 'theme-dos-green', 'theme-dos-red', 'theme-dos-white', 'theme-lcars', 'theme-futuristic', 'theme-tbay'];
         preview.classList.remove(...themeClasses.map(cls => `preview-${cls}`));
         
         // Apply preview theme styles
@@ -1061,6 +1061,10 @@ class POSSimulatorPanel {
                 previewButton.textContent = 'Primary Button';
                 previewText.textContent = 'Dark theme enabled';
                 break;
+            case 'tbay':
+                previewButton.textContent = 'Approve';
+                previewText.textContent = 'tbay.tk brand active';
+                break;
             default:
                 previewButton.textContent = 'Primary Button';
                 previewText.textContent = 'Sample text content';
@@ -1069,6 +1073,7 @@ class POSSimulatorPanel {
 
     getThemeDisplayName(themeName) {
         const themeNames = {
+            'tbay': 'tbay.tk Brand',
             'default': 'Default',
             'dark': 'Dark Mode',
             'dos-green': 'DOS Terminal (Green)',
@@ -1082,7 +1087,7 @@ class POSSimulatorPanel {
 
     loadTheme() {
         chrome.storage.local.get('posSimulatorTheme', (result) => {
-            const theme = result.posSimulatorTheme || 'default';
+            const theme = result.posSimulatorTheme || 'tbay';
             document.getElementById('theme-preset-select').value = theme;
             this.applyTheme(theme);
             this.updateThemePreview(theme);
@@ -1133,7 +1138,7 @@ class POSSimulatorPanel {
             }
             
             // Load theme
-            const theme = result.posSimulatorTheme || 'default';
+            const theme = result.posSimulatorTheme || 'tbay';
             document.getElementById('theme-preset-select').value = theme;
             this.applyTheme(theme);
             this.updateThemePreview(theme);
