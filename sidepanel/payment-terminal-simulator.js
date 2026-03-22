@@ -192,12 +192,15 @@
 
         state.posHandshakeValid = shouldConnect;
 
-        // Update the terminal status light in the panel header
-        if (elTerminalStatus) {
+        // Update the terminal status light in the panel header.
+        // Use a direct getElementById query instead of the cached reference to avoid
+        // a null reference if this signal arrives before chrome.storage.local.get completes.
+        const terminalStatus = document.getElementById('terminal-status');
+        if (terminalStatus) {
             if (shouldConnect) {
-                elTerminalStatus.classList.add('connected');
+                terminalStatus.classList.add('connected');
             } else {
-                elTerminalStatus.classList.remove('connected');
+                terminalStatus.classList.remove('connected');
             }
         }
 

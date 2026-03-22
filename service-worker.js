@@ -52,6 +52,12 @@ class PeripheralSimulatorService {
             this.sidePanelPort = null;
         });
         this.updatePanelWithInitialState();
+
+        // Ask all connected POS tabs to re-send their current terminal state
+        // so the panel status light reflects the POS settings immediately on open.
+        this.contentScriptPorts.forEach((csPort) => {
+            csPort.postMessage({ type: 'REQUEST_TERMINAL_STATE' });
+        });
     }
 
     handleContentScriptConnection(port) {
