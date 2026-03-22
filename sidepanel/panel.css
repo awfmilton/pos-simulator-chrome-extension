@@ -2240,3 +2240,385 @@ input:checked + .slider:before {
     padding-top: 4px;
     letter-spacing: 0.03em;
 }
+
+/* ============================================================
+   TBAY.TK BRAND THEME  v1.1
+   Matches the tbay.tk POS Design System Manual
+   Applied via:  document.body.classList.add('theme-tbay')
+   ============================================================ */
+
+/* ── CSS variable overrides ──────────────────────────────── */
+.theme-tbay {
+    --primary-color:    #00d4d4;
+    --primary-hover:    #00a0a0;
+    --secondary-color:  #4f5c78;
+    --secondary-hover:  #8896b4;
+    --success-color:    #00e5a0;
+    --warning-color:    #f5a623;
+    --danger-color:     #ff4d6d;
+    --danger-hover:     #ff6b87;
+    --background:       #08090f;
+    --surface:          #141b2d;
+    --surface-dark:     #0c0f1a;
+    --text-primary:     #e4eaf5;
+    --text-secondary:   #8896b4;
+    --border:           rgba(255, 255, 255, 0.07);
+    --border-focus:     #00d4d4;
+    --shadow:           0 4px 32px rgba(0, 0, 0, 0.5);
+    --shadow-lg:        0 8px 64px rgba(0, 0, 0, 0.7);
+    --border-radius:    8px;
+    --border-radius-lg: 16px;
+}
+
+/* ── Base layout ─────────────────────────────────────────── */
+.theme-tbay body,
+.theme-tbay {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background-color: #08090f;
+    color: #e4eaf5;
+}
+
+.theme-tbay .simulator-container {
+    background: #08090f;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.theme-tbay .header {
+    background: #0c0f1a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.theme-tbay .header h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+}
+
+.theme-tbay .status-bar {
+    color: #8896b4;
+}
+
+/* ── Tab navigation ──────────────────────────────────────── */
+.theme-tbay .tab-nav {
+    background: #0c0f1a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.theme-tbay .tab-btn {
+    color: #8896b4;
+    background: transparent;
+    border-bottom: 2px solid transparent;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.theme-tbay .tab-btn:hover {
+    color: #e4eaf5;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.theme-tbay .tab-btn.active {
+    color: #00d4d4;
+    border-bottom-color: #00d4d4;
+    background: rgba(0, 212, 212, 0.06);
+}
+
+/* ── Tab panels ──────────────────────────────────────────── */
+.theme-tbay .tab-panel {
+    background: #08090f;
+}
+
+/* ── Section headings ────────────────────────────────────── */
+.theme-tbay h2,
+.theme-tbay h3,
+.theme-tbay h4 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+}
+
+/* ── Form inputs ─────────────────────────────────────────── */
+.theme-tbay input[type="text"],
+.theme-tbay input[type="number"],
+.theme-tbay input[type="email"],
+.theme-tbay input[type="password"],
+.theme-tbay input[type="url"],
+.theme-tbay select,
+.theme-tbay textarea {
+    background: #141b2d;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: #e4eaf5;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.theme-tbay input[type="text"]:focus,
+.theme-tbay input[type="number"]:focus,
+.theme-tbay input[type="email"]:focus,
+.theme-tbay input[type="password"]:focus,
+.theme-tbay input[type="url"]:focus,
+.theme-tbay select:focus,
+.theme-tbay textarea:focus {
+    border-color: #00d4d4;
+    box-shadow: 0 0 0 3px rgba(0, 212, 212, 0.12);
+    outline: none;
+}
+
+.theme-tbay input::placeholder,
+.theme-tbay textarea::placeholder {
+    color: #4f5c78;
+}
+
+.theme-tbay label {
+    color: #8896b4;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.855rem;
+    font-weight: 500;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.theme-tbay .primary-btn,
+.theme-tbay button.primary-btn {
+    background: #00d4d4;
+    color: #000000;
+    border: none;
+    border-radius: 9999px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.theme-tbay .primary-btn:hover {
+    background: #ffffff;
+    color: #000000;
+    box-shadow: 0 6px 24px rgba(0, 212, 212, 0.35);
+    transform: translateY(-1px);
+}
+
+.theme-tbay .secondary-btn,
+.theme-tbay button.secondary-btn {
+    background: transparent;
+    color: #e4eaf5;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 9999px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.theme-tbay .secondary-btn:hover {
+    border-color: #00d4d4;
+    color: #00d4d4;
+    background: rgba(0, 212, 212, 0.05);
+}
+
+.theme-tbay .danger-btn,
+.theme-tbay button.danger-btn {
+    background: #ff4d6d;
+    color: #ffffff;
+    border: none;
+    border-radius: 9999px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.theme-tbay .danger-btn:hover {
+    background: #ff6b87;
+    transform: translateY(-1px);
+}
+
+/* ── Cards / sections ────────────────────────────────────── */
+.theme-tbay .card,
+.theme-tbay .panel-section,
+.theme-tbay .input-group-card {
+    background: #141b2d;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+}
+
+.theme-tbay .section-header,
+.theme-tbay .panel-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+}
+
+/* ── Keyboard keys ───────────────────────────────────────── */
+.theme-tbay .keyboard-key {
+    background: #141b2d;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: #e4eaf5;
+    font-family: 'JetBrains Mono', monospace;
+    border-radius: 8px;
+    transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.theme-tbay .keyboard-key:hover {
+    border-color: rgba(0, 212, 212, 0.22);
+    background: #1a2238;
+    box-shadow: 0 0 40px rgba(0, 212, 212, 0.12);
+}
+
+.theme-tbay .keyboard-key:active {
+    background: rgba(0, 212, 212, 0.08);
+    border-color: #00d4d4;
+}
+
+/* ── Credit card visual ──────────────────────────────────── */
+.theme-tbay .card-visual {
+    background: linear-gradient(135deg, #0c0f1a 0%, #141b2d 50%, #1a2238 100%);
+    border: 1px solid rgba(0, 212, 212, 0.22);
+    box-shadow: 0 0 28px rgba(0, 212, 212, 0.08);
+    color: #e4eaf5;
+}
+
+.theme-tbay .tap-area {
+    border-color: rgba(255, 255, 255, 0.07);
+}
+
+.theme-tbay .tap-area:hover {
+    border-color: rgba(0, 212, 212, 0.4);
+    background: rgba(0, 212, 212, 0.06);
+}
+
+.theme-tbay .chip-slot {
+    background: #1a2238;
+    border-color: rgba(255, 255, 255, 0.07);
+}
+
+/* ── Status indicators ───────────────────────────────────── */
+.theme-tbay .status-indicator.online  { background: #00e5a0; }
+.theme-tbay .status-indicator.offline { background: #ff4d6d; }
+.theme-tbay .status-indicator.pending { background: #f5a623; }
+
+/* ── Modals ──────────────────────────────────────────────── */
+.theme-tbay .modal-backdrop {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.theme-tbay .modal-content {
+    background: #0c0f1a;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 24px;
+    color: #e4eaf5;
+    box-shadow: 0 8px 64px rgba(0, 0, 0, 0.7);
+}
+
+.theme-tbay .modal-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    font-family: 'Syne', sans-serif;
+    color: #ffffff;
+}
+
+.theme-tbay .modal-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.theme-tbay .close-btn {
+    color: #4f5c78;
+}
+
+.theme-tbay .close-btn:hover {
+    color: #ffffff;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────── */
+.theme-tbay ::-webkit-scrollbar {
+    width: 6px;
+}
+
+.theme-tbay ::-webkit-scrollbar-track {
+    background: #0c0f1a;
+}
+
+.theme-tbay ::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 212, 0.3);
+    border-radius: 9999px;
+}
+
+.theme-tbay ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 212, 212, 0.55);
+}
+
+/* ── Transaction log / terminal output ───────────────────── */
+.theme-tbay .transaction-log,
+.theme-tbay .log-container,
+.theme-tbay .output-area {
+    background: #101624;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    color: #8896b4;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+}
+
+.theme-tbay .log-entry.success { color: #00e5a0; }
+.theme-tbay .log-entry.error   { color: #ff4d6d; }
+.theme-tbay .log-entry.info    { color: #00d4d4; }
+.theme-tbay .log-entry.warning { color: #f5a623; }
+
+/* ── Theme settings preview card ────────────────────────── */
+.preview-theme-tbay .preview-card {
+    background: #141b2d;
+    border: 1px solid rgba(0, 212, 212, 0.22);
+    border-radius: 12px;
+    box-shadow: 0 0 28px rgba(0, 212, 212, 0.08);
+    color: #e4eaf5;
+}
+
+.preview-theme-tbay .preview-header {
+    background: #0c0f1a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+}
+
+.preview-theme-tbay .preview-button {
+    background: #00d4d4;
+    color: #000000;
+    border-radius: 9999px;
+    font-weight: 600;
+}
+
+.preview-theme-tbay .preview-text {
+    color: #8896b4;
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Monospace data (amounts, IDs, timestamps) ───────────── */
+.theme-tbay .mono,
+.theme-tbay code,
+.theme-tbay .amount,
+.theme-tbay .terminal-id {
+    font-family: 'JetBrains Mono', monospace;
+    color: #00d4d4;
+}
+
+/* ── Engineer's toolbar stays dark regardless of theme ───── */
+.theme-tbay .engineer-toolbar {
+    background: #0c0f1a;
+    border-color: rgba(0, 212, 212, 0.15);
+    color: #8896b4;
+}
+
+/* ── Approve / decline button colours ────────────────────── */
+.theme-tbay .approve-btn {
+    background: #00e5a0;
+    color: #000;
+}
+
+.theme-tbay .decline-btn {
+    background: #ff4d6d;
+    color: #fff;
+}
+/* ============================================================
+   END TBAY.TK BRAND THEME
+   ============================================================ */
