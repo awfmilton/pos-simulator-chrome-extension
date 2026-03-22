@@ -36,6 +36,10 @@ class POSContentScript {
         this.port = chrome.runtime.connect({ name: 'content-script' });
         console.log('[CS] Attempting to connect to service worker...');
 
+        // Immediately broadcast current POS terminal state so the side panel
+        // can update the status light if it was already open before this page loaded.
+        this._broadcastTerminalState();
+
         this.port.onMessage.addListener((request) => {
             if (request.action === 'INJECT_INPUT') {
                 this.injectInput(request.data);
@@ -69,12 +73,28 @@ class POSContentScript {
                     timestamp: request.timestamp,
                 }, '*');
             }
+            // ── SW requests current terminal state (e.g. when side panel connects) ─
+            if (request.type === 'REQUEST_TERMINAL_STATE') {
+                this._broadcastTerminalState();
+            }
         });
 
         this.port.onDisconnect.addListener(() => {
             console.error('[CS] Disconnected from service worker. Attempting to reconnect in 5 seconds...');
             this.port = null;
             setTimeout(() => this.connectToServiceWorker(), 5000);
+        });
+    }
+
+    /** Read current terminal settings from localStorage and send to SW. */
+    _broadcastTerminalState() {
+        if (!this.port) return;
+        this.port.postMessage({
+            type:       'TERMINAL_READY_SIGNAL',
+            enabled:    localStorage.getItem('terminalEnabled') === '1',
+            brand:      localStorage.getItem('terminalBrand') || 'stripe',
+            debug:      localStorage.getItem('terminal_debug_enabled') === '1',
+            terminalIp: localStorage.getItem('terminal_ip_address') || '',
         });
     }
 
