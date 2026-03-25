@@ -595,9 +595,13 @@ License: personal use $5/month, business use $100/month
                     <div class="engineer-toolbar-row" id="moneris-card-row" style="display:none;">
                         <label for="moneris-test-card-select">Moneris QA card:</label>
                         <select id="moneris-test-card-select">
-                            <option value="4005550000000019">4005 … 0019 — Visa (Approved)</option>
-                            <option value="5454545454545454">5454 … 5454 — MasterCard (Approved)</option>
-                            <option value="4111111111111111">4111 … 1111 — Visa (Approved, standard)</option>
+                            <option value="">Auto (outcome selects card)</option>
+                            <option value="4502285070000007">Visa — Always Approve (4502...0007)</option>
+                            <option value="4242424242424242">Visa 4242 — Amount controls outcome</option>
+                            <option value="4485621544903528">Visa — Always Decline: Low Funds</option>
+                            <option value="4355310002576375">Visa — Always Decline: Expired</option>
+                            <option value="4716091243227333">Visa — Always Decline: Restricted</option>
+                            <option value="5454545454545454">Mastercard 5454 — Penny amounts</option>
                         </select>
                     </div>
 
@@ -701,6 +705,10 @@ License: personal use $5/month, business use $100/month
                     <div class="activity-log terminal-log">
                         <p class="log-empty-msg" id="terminal-no-pending">No pending terminal requests.</p>
                         <ul id="terminal-log-list" class="terminal-log-list"></ul>
+                    </div>
+                    <div class="log-toolbar" style="display:flex;gap:6px;margin-top:6px;">
+                        <button id="terminal-log-export" title="Export session log as JSON" style="font-size:.75rem;padding:3px 10px;">⬇ Export Log</button>
+                        <button id="terminal-log-clear" title="Clear transaction log" style="font-size:.75rem;padding:3px 10px;">✕ Clear Log</button>
                     </div>
                 </div>
 

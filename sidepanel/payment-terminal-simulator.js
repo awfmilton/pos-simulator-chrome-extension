@@ -398,6 +398,10 @@
         }
 
         // Stripe test card selector — value is read by _stripeCardForOutcome() at response time
+
+        // ── Transaction Log toolbar ──────────────────────────────────────────
+        document.getElementById('terminal-log-export')?.addEventListener('click', _exportLog);
+        document.getElementById('terminal-log-clear')?.addEventListener('click',  _clearLog);
     }
 
     function _btn(el, handler) {
@@ -591,12 +595,8 @@
         try {
             const token = await _getMonerisToken();
 
-            // Use sandbox penny amounts to guarantee the intended outcome
-            const amountCents = (outcome === 'approved') ? 1100 : 5100;
-
-            const cardNumber = (elMonerisCardSelect && elMonerisCardSelect.value)
-                ? elMonerisCardSelect.value
-                : '4242424242424242';
+            // Resolve the correct amount and card number based on outcome and operator selection
+            const { amountCents, cardNumber } = _resolveAmountAndCard(req, outcome, method);
 
             // Sanitise orderId — only alphanumeric, dashes, underscores; max 50 chars
             const rawOrderId = req.orderId ?? ('SIM-' + Date.now());
@@ -612,7 +612,7 @@
                     card: {
                         cardNumber,
                         expiryMonth: 12,
-                        expiryYear:  2025,
+                        expiryYear:  2026,
                         cardSecurityCode: '123',
                     },
                     storePaymentMethod: 'DO_NOT_STORE',
@@ -701,9 +701,12 @@
 
             _updateMonerisScreenForOutcome(realOutcome);
             _markLogEntryResolved(req.id, realOutcome, method, {
-                transId:     vendorPayload.TransID,
-                authCode:    vendorPayload.ApprovalCode,
-                rawResponse: parsed,
+                transId:      vendorPayload.TransID,
+                authCode:     vendorPayload.ApprovalCode,
+                cardLast4:    cardNumber.slice(-4),
+                isoCode:      parsed.transactionDetails?.isoResponseCode,
+                responseCode: parsed.transactionDetails?.responseCode,
+                rawResponse:  parsed,
             });
             _refreshButtonState();
             _updateBadge();
@@ -876,6 +879,90 @@
         elLogList.insertBefore(li, elLogList.firstChild);
     }
 
+    /**
+     * Resolve the amountCents and cardNumber to send to the Moneris Cloud API.
+     * Static Visa override cards always approve/decline regardless of amount — so the
+     * actual transaction amount is passed through unchanged. Penny-amount cards
+     * (Visa 4242, Mastercard 5454) use the configured amounts to force outcomes.
+     */
+    function _resolveAmountAndCard(req, outcome, method) {
+        const actualCents  = Math.round(parseFloat(req.amount) * 100);
+        const selectedCard = elMonerisCardSelect?.value?.trim() || '';
+
+        const VISA_ALWAYS_APPROVE = new Set([
+            '4502285070000007', '4924190000003750',
+            '4551210032790206', '4924190000000145', '4524000000015080',
+        ]);
+        const VISA_ALWAYS_DECLINE = new Set([
+            '4485621544903528', '4355310002576375',
+            '4716091243227333', '4556462273286718', '4217048416210847',
+        ]);
+
+        // Operator explicitly picked a static-override card — use actual amount
+        if (selectedCard && (VISA_ALWAYS_APPROVE.has(selectedCard) || VISA_ALWAYS_DECLINE.has(selectedCard))) {
+            return { amountCents: actualCents, cardNumber: selectedCard };
+        }
+
+        switch (outcome) {
+            case 'approved':
+            case 'partial_auth':
+                // 4502285070000007 = always approve regardless of amount
+                return { amountCents: actualCents, cardNumber: '4502285070000007' };
+
+            case 'declined': {
+                const methodCardMap = {
+                    nsf:              '4485621544903528',
+                    expired:          '4355310002576375',
+                    stolen:           '4716091243227333',
+                    cvc:              '4716091243227333',
+                    processing_error: '4485621544903528',
+                };
+                // Mastercard 5454 has no static override — use penny amounts
+                if (selectedCard === '5454545454545454') {
+                    const mcPenny = { nsf: 5, expired: 5, stolen: 43, default: 5 };
+                    return { amountCents: mcPenny[method] ?? mcPenny.default, cardNumber: selectedCard };
+                }
+                return { amountCents: actualCents, cardNumber: methodCardMap[method] ?? '4485621544903528' };
+            }
+
+            case 'timeout':
+                // 68 cents triggers System Timeout in Moneris sandbox
+                return { amountCents: 68, cardNumber: '4242424242424242' };
+
+            default:
+                return { amountCents: actualCents, cardNumber: selectedCard || '4242424242424242' };
+        }
+    }
+
+    function _exportLog() {
+        const entries = Array.from(elLogList?.querySelectorAll('.terminal-log-entry') ?? []);
+        const rows = entries.map(el => ({
+            time:        el.querySelector('.log-time')?.textContent ?? null,
+            gateway:     el.querySelector('.log-gateway')?.textContent ?? null,
+            amount:      el.querySelector('.log-amount')?.textContent ?? null,
+            status:      el.querySelector('.log-status')?.textContent ?? null,
+            txnId:       el.querySelector('.log-txn-id')?.textContent ?? null,
+            authCode:    el.querySelector('.log-auth-code')?.textContent ?? null,
+            rawResponse: (() => {
+                const raw = el.querySelector('.log-raw-json')?.textContent?.trim();
+                if (!raw) return null;
+                try { return JSON.parse(raw.replace(/^.*?\n\n/s, '')); } catch { return raw; }
+            })(),
+        }));
+        const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), {
+            href: url, download: 'moneris-session-log-' + Date.now() + '.json',
+        });
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function _clearLog() {
+        if (elLogList) elLogList.innerHTML = '';
+        if (elNoPending) elNoPending.style.display = '';
+    }
+
     function _markLogEntryResolved(reqId, outcome, method, extras = {}) {
         const li = document.getElementById('terminal-entry-' + reqId);
         if (!li) return;
@@ -905,7 +992,12 @@
             const rawPre = li.querySelector('.log-raw-json');
             const rawBtn = li.querySelector('.log-expand-btn');
             if (rawPre && rawBtn) {
-                rawPre.textContent  = JSON.stringify(extras.rawResponse, null, 2);
+                const meta = [];
+                if (extras.cardLast4)    meta.push('Card: •••• ' + extras.cardLast4);
+                if (extras.isoCode)      meta.push('ISO: ' + extras.isoCode);
+                if (extras.responseCode) meta.push('RC: ' + extras.responseCode);
+                rawPre.textContent  = (meta.length ? meta.join('  |  ') + '\n\n' : '')
+                                    + JSON.stringify(extras.rawResponse, null, 2);
                 rawBtn.style.display = '';
             }
         }
