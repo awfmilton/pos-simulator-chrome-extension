@@ -38,6 +38,9 @@
         gearClickTimer: null,
         virtualIp: null,        // assigned on init from chrome.storage.local
         posHandshakeValid: false, // true when POS IP matches virtualIp and enabled=true
+        // Moneris Cloud API token cache
+        monerisToken: null,         // cached Bearer token string
+        monerisTokenExpiry: 0,      // ms timestamp after which the token must be refreshed
     };
 
     // ─── DOM references ──────────────────────────────────────────────────────
@@ -57,6 +60,10 @@
         // Moneris iPP320 virtual display
         elMonerisScreenLine1, elMonerisScreenLine2,
         elMonerisPairingToken, elMonerisDisplaySection,
+        // Moneris Cloud API credential inputs (always-visible section)
+        elExtEnvironmentSelect,
+        elMonerisClientId, elMonerisClientSecret, elMonerisMerchantId,
+        elMonerisSaveCredentials, elMonerisCredStatus, elMonerisCredSection,
         // Virtual IP display and terminal status light
         elVirtualIpSpan, elTerminalStatus;
 
@@ -79,21 +86,35 @@
 
         // Load or generate a persistent virtual IP for this simulator instance.
         // chrome.storage.local is used so the same IP survives panel reloads.
-        chrome.storage.local.get('terminalVirtualIp', function (result) {
-            if (result.terminalVirtualIp) {
-                state.virtualIp = result.terminalVirtualIp;
-            } else {
-                // Generate a random address in 192.168.100.2–254
-                const octet = Math.floor(Math.random() * 253) + 2;
-                state.virtualIp = '192.168.100.' + octet;
-                chrome.storage.local.set({ terminalVirtualIp: state.virtualIp });
+        chrome.storage.local.get(
+            ['terminalVirtualIp', 'terminalEnvironment', 'monerisClientId', 'monerisClientSecret', 'monerisMerchantId'],
+            function (result) {
+                if (result.terminalVirtualIp) {
+                    state.virtualIp = result.terminalVirtualIp;
+                } else {
+                    // Generate a random address in 192.168.100.2–254
+                    const octet = Math.floor(Math.random() * 253) + 2;
+                    state.virtualIp = '192.168.100.' + octet;
+                    chrome.storage.local.set({ terminalVirtualIp: state.virtualIp });
+                }
+                _cacheDOM();
+                _bindEvents();
+                _refreshButtonState();
+                _renderVirtualIp();
+
+                // Restore persisted environment and credentials
+                if (result.terminalEnvironment) {
+                    state.environment = result.terminalEnvironment;
+                    if (elExtEnvironmentSelect) elExtEnvironmentSelect.value = result.terminalEnvironment;
+                    _updateSandboxBadge(result.terminalEnvironment);
+                }
+                if (elMonerisClientId     && result.monerisClientId)     elMonerisClientId.value     = result.monerisClientId;
+                if (elMonerisClientSecret && result.monerisClientSecret) elMonerisClientSecret.value = result.monerisClientSecret;
+                if (elMonerisMerchantId   && result.monerisMerchantId)   elMonerisMerchantId.value   = result.monerisMerchantId;
+
+                console.log('[TerminalSim] Initialized. Virtual IP:', state.virtualIp, '| Environment:', state.environment);
             }
-            _cacheDOM();
-            _bindEvents();
-            _refreshButtonState();
-            _renderVirtualIp();
-            console.log('[TerminalSim] Initialized. Virtual IP:', state.virtualIp);
-        });
+        );
     };
 
     /**
@@ -271,6 +292,14 @@
         elMonerisScreenLine1    = document.getElementById('moneris-screen-line1');
         elMonerisScreenLine2    = document.getElementById('moneris-screen-line2');
         elMonerisPairingToken   = document.getElementById('moneris-pairing-token');
+        // Moneris Cloud API credentials section
+        elExtEnvironmentSelect  = document.getElementById('ext-environment-select');
+        elMonerisClientId       = document.getElementById('moneris-client-id');
+        elMonerisClientSecret   = document.getElementById('moneris-client-secret');
+        elMonerisMerchantId     = document.getElementById('moneris-merchant-id');
+        elMonerisSaveCredentials= document.getElementById('moneris-save-credentials');
+        elMonerisCredStatus     = document.getElementById('moneris-cred-status');
+        elMonerisCredSection    = document.getElementById('moneris-credentials-section');
         // Virtual IP display and terminal status light
         elVirtualIpSpan         = document.getElementById('terminal-virtual-ip');
         elTerminalStatus        = document.getElementById('terminal-status');
@@ -325,6 +354,46 @@
         if (elForceResultSelect) {
             elForceResultSelect.addEventListener('change', () => {
                 state.forceResult = elForceResultSelect.value;
+            });
+        }
+
+        // ── Environment selector ─────────────────────────────────────────────
+        if (elExtEnvironmentSelect) {
+            elExtEnvironmentSelect.addEventListener('change', () => {
+                state.environment = elExtEnvironmentSelect.value;
+                chrome.storage.local.set({ terminalEnvironment: state.environment });
+                _updateSandboxBadge(state.environment);
+                if (state.debug) {
+                    console.log('[TerminalSim] Environment set to:', state.environment);
+                }
+            });
+        }
+
+        // ── Moneris credentials save button ─────────────────────────────────
+        if (elMonerisSaveCredentials) {
+            elMonerisSaveCredentials.addEventListener('click', () => {
+                const clientId     = elMonerisClientId     ? elMonerisClientId.value.trim()     : '';
+                const clientSecret = elMonerisClientSecret ? elMonerisClientSecret.value         : '';
+                const merchantId   = elMonerisMerchantId   ? elMonerisMerchantId.value.trim()   : '';
+
+                chrome.storage.local.set({
+                    monerisClientId:     clientId,
+                    monerisClientSecret: clientSecret,
+                    monerisMerchantId:   merchantId,
+                }, () => {
+                    // Invalidate token cache so next request gets a fresh token
+                    state.monerisToken       = null;
+                    state.monerisTokenExpiry = 0;
+
+                    if (elMonerisCredStatus) {
+                        elMonerisCredStatus.textContent = 'Saved ✓';
+                        elMonerisCredStatus.style.color = '#16a34a';
+                        setTimeout(() => { elMonerisCredStatus.textContent = ''; }, 4000);
+                    }
+                    if (state.debug) {
+                        console.log('[TerminalSim][Moneris] Credentials saved to chrome.storage.local');
+                    }
+                });
             });
         }
 
@@ -510,71 +579,193 @@
     }
 
     /**
-     * Call moneris_simulate.php with the selected test card, get a real Moneris QA
-     * API response, and dispatch it as the vendorPayload.
+     * Call the Moneris Cloud API directly from the extension (no PHP proxy).
      *
-     * Moneris QA test cards (store1 / yesguy / esqa.moneris.com):
-     *   4005550000000019  Visa — always approved
-     *   5454545454545454  MC   — always approved
-     *   4111111111111111  Visa — approved (standard test card)
-     * Decline outcomes are driven by expdate: 1100 triggers decline on QA.
+     * Sandbox penny-value rules (amount controls outcome, not card number):
+     *   $11.00 (1100 cents) → guaranteed approve
+     *   $51.00 (5100 cents) → guaranteed decline
+     *
+     * OAuth token is cached in state for up to 24 h (with a 5-min buffer).
      */
-    function _callMonerisSimulate(req, outcome, method) {
-        const posOrigin = state.posOrigin || 'http://localhost:8000';
+    async function _callMonerisSimulate(req, outcome, method) {
+        try {
+            const token = await _getMonerisToken();
 
-        // Pick test card from the Engineer's Toolbar selector, or derive from outcome
-        let pan     = (elMonerisCardSelect && elMonerisCardSelect.value) ? elMonerisCardSelect.value : '4005550000000019';
-        let expdate = '2512'; // YYMM — valid future date → approved on QA
+            // Use sandbox penny amounts to guarantee the intended outcome
+            const amountCents = (outcome === 'approved') ? 1100 : 5100;
 
-        // Force a decline on QA by using expdate=1100 (past date) for decline outcomes
-        if (outcome === 'declined' || outcome === 'timeout') {
-            expdate = '1100';
-        }
+            const cardNumber = (elMonerisCardSelect && elMonerisCardSelect.value)
+                ? elMonerisCardSelect.value
+                : '4242424242424242';
 
-        fetch(`${posOrigin}/api/moneris_simulate.php`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                amount:   req.amount,
-                pan,
-                expdate,
-                order_id: req.orderId ?? ('SIM-' + Date.now()),
-            }),
-        })
-        .then(r => r.json())
-        .then(simResult => {
+            // Sanitise orderId — only alphanumeric, dashes, underscores; max 50 chars
+            const rawOrderId = req.orderId ?? ('SIM-' + Date.now());
+            const orderId    = rawOrderId.replace(/[^a-zA-Z0-9\-_]/g, '').substring(0, 50);
+
+            const body = {
+                idempotencyKey: _generateUUID(),
+                orderId,
+                amount: { amount: amountCents, currency: req.currency ?? 'CAD' },
+                automaticCapture: true,
+                paymentMethod: {
+                    paymentMethodSource: 'CARD',
+                    card: {
+                        cardNumber,
+                        expiryMonth: 12,
+                        expiryYear:  2025,
+                        cardSecurityCode: '123',
+                    },
+                    storePaymentMethod: 'DO_NOT_STORE',
+                },
+            };
+
+            if (state.debug) {
+                console.log('[TerminalSim][Moneris] Cloud API request', { orderId, amountCents, cardNumber });
+            }
+
+            const merchantId = (elMonerisMerchantId?.value.trim()) || '0030200110408';
+
+            const res    = await fetch('https://api.sb.moneris.io/payments', {
+                method: 'POST',
+                headers: {
+                    'Authorization':  'Bearer ' + token,
+                    'Api-Version':    '2025-08-14',
+                    'X-Merchant-Id':  merchantId,
+                    'Content-Type':   'application/json',
+                    'Accept':         'application/json',
+                },
+                body: JSON.stringify(body),
+            });
+
+            const parsed = await res.json();
+
+            if (state.debug) {
+                console.log('[TerminalSim][Moneris] Cloud API response', { status: res.status, parsed });
+            }
+
+            // Map Cloud API outcome to simulator outcome
+            let realOutcome;
+            if (parsed.paymentStatus === 'SUCCEEDED') {
+                realOutcome = 'approved';
+            } else if (parsed.paymentStatus === 'DECLINED' || res.status === 422) {
+                realOutcome = 'declined';
+            } else {
+                realOutcome = outcome; // fallback to operator's intent
+            }
+
+            const isApproved = realOutcome === 'approved';
+            const now = new Date();
+
+            // Normalise Cloud API response into the legacy vendorPayload shape
+            // that MonerisForm.vue reads (ResponseCode, TransID, ApprovalCode, etc.)
+            const vendorPayload = {
+                ResponseCode:      isApproved ? '027' : '481',
+                Message:           parsed.transactionDetails?.message ?? (isApproved ? 'APPROVED' : 'DECLINED'),
+                TransID:           parsed.paymentId ?? ('SIM-' + Date.now()),
+                ApprovalCode:      parsed.transactionDetails?.authorizationCode ?? null,
+                ReferenceNum:      parsed.paymentId ?? ('moneris_' + Date.now()),
+                ReceiptId:         'REC-' + Date.now(),
+                CardType:          'V',
+                AvsResultCode:     isApproved ? 'Y' : 'N',
+                CvdResultCode:     isApproved ? '1' : '3',
+                TransDate:         now.toISOString().split('T')[0],
+                TransTime:         now.toTimeString().split(' ')[0],
+                Complete:          isApproved ? 'true' : 'false',
+                TimedOut:          'false',
+                requested_amount:  req.amount,
+                authorized_amount: isApproved ? req.amount : '0.00',
+                iso_code:          isApproved ? '00' : '05',
+                txn_num:           parsed.paymentId ?? null,
+            };
+
             state.pendingRequests.shift();
-
-            const vendorPayload = simResult.data ?? _buildVendorPayload('moneris', outcome, method, req);
-            const realOutcome   = simResult.outcome ?? outcome;
 
             const payload = {
                 type:          'TERMINAL_SIMULATE_RESPONSE',
                 requestId:     req.id,
                 outcome:       realOutcome,
                 method,
-                reference:     simResult.transaction_id ?? ('moneris_' + Date.now()),
+                reference:     parsed.paymentId ?? ('moneris_' + Date.now()),
                 gateway:       req.gateway,
                 brand:         'moneris',
                 timestamp:     new Date().toISOString(),
                 vendorPayload,
+                rawResponse:   parsed,
             };
 
-            if (realOutcome !== 'approved') {
-                payload.reason = simResult.message ?? REASON_MESSAGES[method] ?? 'Card declined.';
+            if (!isApproved) {
+                payload.reason = REASON_MESSAGES[method] ?? REASON_MESSAGES[realOutcome] ?? 'Card declined.';
             }
 
             if (state.swPort) state.swPort.postMessage(payload);
 
             _updateMonerisScreenForOutcome(realOutcome);
-            _markLogEntryResolved(req.id, realOutcome, method);
+            _markLogEntryResolved(req.id, realOutcome, method, {
+                transId:     vendorPayload.TransID,
+                authCode:    vendorPayload.ApprovalCode,
+                rawResponse: parsed,
+            });
             _refreshButtonState();
             _updateBadge();
-        })
-        .catch(err => {
-            console.error('[TerminalSim] moneris_simulate.php failed, falling back to mock:', err);
+
+        } catch (err) {
+            console.error('[TerminalSim] Moneris Cloud API call failed, falling back to mock:', err);
             state.pendingRequests.shift();
             _dispatchResponseDirect(outcome, method, req);
+        }
+    }
+
+    /**
+     * Fetch an OAuth2 client-credentials token from the Moneris Cloud API.
+     * Caches it in state until 5 minutes before expiry.
+     */
+    async function _getMonerisToken() {
+        const now = Date.now();
+        if (state.monerisToken && now < state.monerisTokenExpiry) {
+            return state.monerisToken;
+        }
+
+        // Read credentials from the extension UI (fallback to sandbox demo credentials)
+        const clientId     = (elMonerisClientId?.value.trim())     || '40d7f86d-81fa-432e-ab9c-fd32570553f5';
+        const clientSecret = (elMonerisClientSecret?.value.trim()) || '6Cb8Q~ZIGLGYuOo1DD-yftWpFb_llqpyFYsp-aBH';
+
+        const formBody = new URLSearchParams({
+            grant_type:    'client_credentials',
+            client_id:     clientId,
+            client_secret: clientSecret,
+            scope:         'payment.write',
+        }).toString();
+
+        const res    = await fetch('https://api.sb.moneris.io/oauth2/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formBody,
+        });
+        const parsed = await res.json();
+
+        if (!parsed.access_token) {
+            throw new Error('[TerminalSim] Moneris OAuth failed: ' + JSON.stringify(parsed));
+        }
+
+        state.monerisToken       = parsed.access_token;
+        // expires_in is seconds; subtract 5-min buffer, convert to ms
+        state.monerisTokenExpiry = now + (parseInt(parsed.expires_in, 10) - 300) * 1000;
+
+        if (state.debug) {
+            console.log('[TerminalSim][Moneris] OAuth token refreshed. Expires in:', parsed.expires_in, 's');
+        }
+
+        return state.monerisToken;
+    }
+
+    /** Generate a UUID v4 for idempotencyKey. */
+    function _generateUUID() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
         });
     }
 
@@ -649,16 +840,43 @@
         const li = document.createElement('li');
         li.className = 'terminal-log-entry terminal-log-entry--pending';
         li.id        = 'terminal-entry-' + req.id;
-        li.innerHTML = `
-          <span class="log-time">${req.timestamp}</span>
-          <span class="log-gateway">${_gatewayLabel(req.gateway)}</span>
-          <span class="log-amount">${req.currency} $${req.amount}</span>
-          <span class="log-status log-status--pending">⏳ Waiting</span>
-        `;
+
+        // Build DOM manually to avoid innerHTML (no XSS risk from req fields)
+        const makeSpan = (cls, text) => {
+            const s = document.createElement('span');
+            s.className   = cls;
+            s.textContent = text;
+            return s;
+        };
+
+        li.appendChild(makeSpan('log-time',    req.timestamp));
+        li.appendChild(makeSpan('log-gateway', _gatewayLabel(req.gateway)));
+        li.appendChild(makeSpan('log-amount',  req.currency + ' $' + req.amount));
+        li.appendChild(makeSpan('log-status log-status--pending', '⏳ Waiting'));
+        li.appendChild(makeSpan('log-txn-id',  ''));
+        li.appendChild(makeSpan('log-auth-code', ''));
+
+        const expandBtn = document.createElement('button');
+        expandBtn.className   = 'log-expand-btn';
+        expandBtn.textContent = '▶ Details';
+        expandBtn.style.display = 'none';
+        li.appendChild(expandBtn);
+
+        const rawPre = document.createElement('pre');
+        rawPre.className    = 'log-raw-json';
+        rawPre.style.display = 'none';
+        li.appendChild(rawPre);
+
+        expandBtn.addEventListener('click', () => {
+            const expanded = rawPre.style.display !== 'none';
+            rawPre.style.display  = expanded ? 'none' : 'block';
+            expandBtn.textContent = expanded ? '▶ Details' : '▼ Hide';
+        });
+
         elLogList.insertBefore(li, elLogList.firstChild);
     }
 
-    function _markLogEntryResolved(reqId, outcome, method) {
+    function _markLogEntryResolved(reqId, outcome, method, extras = {}) {
         const li = document.getElementById('terminal-entry-' + reqId);
         if (!li) return;
 
@@ -668,12 +886,28 @@
         const statusEl = li.querySelector('.log-status');
         if (statusEl) {
             const icon = outcome === 'approved' ? '✅'
-                : outcome === 'partial_auth'         ? '🔶'
+                : outcome === 'partial_auth'          ? '🔶'
                 : outcome === 'approved_not_captured' ? '🔒'
                 : outcome === 'declined'              ? '❌'
                 : '⏰';
             statusEl.textContent = `${icon} ${outcome.replace(/_/g, ' ')} (${method})`;
             statusEl.className   = `log-status log-status--${outcome}`;
+        }
+
+        // Populate inline transaction ID and auth code (if provided)
+        const txnEl  = li.querySelector('.log-txn-id');
+        const authEl = li.querySelector('.log-auth-code');
+        if (txnEl  && extras.transId)   txnEl.textContent  = 'ID: '   + extras.transId;
+        if (authEl && extras.authCode)  authEl.textContent = 'Auth: ' + extras.authCode;
+
+        // Populate expandable raw JSON (if provided)
+        if (extras.rawResponse) {
+            const rawPre = li.querySelector('.log-raw-json');
+            const rawBtn = li.querySelector('.log-expand-btn');
+            if (rawPre && rawBtn) {
+                rawPre.textContent  = JSON.stringify(extras.rawResponse, null, 2);
+                rawBtn.style.display = '';
+            }
         }
     }
 

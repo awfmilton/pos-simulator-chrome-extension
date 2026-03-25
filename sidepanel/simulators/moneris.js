@@ -23,9 +23,11 @@ window.TerminalSimulators.moneris = (function () {
         const displaySection = document.getElementById('moneris-display-section');
         const cardRow        = document.getElementById('moneris-card-row');
         const pairingToken   = document.getElementById('moneris-pairing-token');
+        const credSection    = document.getElementById('moneris-credentials-section');
 
         if (displaySection) displaySection.style.display = show ? '' : 'none';
         if (cardRow)        cardRow.style.display        = show ? '' : 'none';
+        if (credSection)    credSection.style.display    = show ? '' : 'none';
 
         // Generate a pairing token on first display (Moneris Cloud terminal pairing)
         if (show && pairingToken && !pairingToken.textContent) {
