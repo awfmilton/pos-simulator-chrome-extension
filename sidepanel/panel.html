@@ -549,6 +549,16 @@ License: personal use $5/month, business use $100/month
                     <small style="color:#9ca3af;">(enter this in POS Settings → Terminal Simulator IP)</small>
                 </div>
 
+                <!-- ── Environment Selector ─────────────────────────────────── -->
+                <div class="input-group" style="padding:6px 0 2px;">
+                    <label for="ext-environment-select" style="font-size:.8rem;font-weight:600;">Environment:</label>
+                    <select id="ext-environment-select" style="font-size:.82rem;">
+                        <option value="mock">Mock (no API calls)</option>
+                        <option value="sandbox">Sandbox (real Moneris Cloud API)</option>
+                        <option value="production">Production</option>
+                    </select>
+                </div>
+
                 <!-- ── Engineer's Toolbar (hidden by default) ───────────────── -->
                 <div id="engineer-toolbar" class="engineer-toolbar" style="display:none;">
                     <div class="engineer-toolbar-header">
@@ -610,6 +620,39 @@ License: personal use $5/month, business use $100/month
                         <option value="paypal">PayPal / Zettle Terminal</option>
                     </select>
                 </div>
+
+                <!-- ── Moneris Cloud API Credentials ────────────────────────── -->
+                <div id="moneris-credentials-section" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;margin-bottom:10px;">
+                    <div style="font-size:.82rem;font-weight:700;margin-bottom:8px;color:#1e3a5f;">Moneris Cloud API Credentials</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                        <div>
+                            <label for="moneris-client-id" style="font-size:.75rem;font-weight:600;display:block;color:#374151;">Application ID (client_id)</label>
+                            <input id="moneris-client-id" type="text" autocomplete="off" spellcheck="false"
+                                   placeholder="e.g. 40d7f86d-81fa-432e-ab9c-..."
+                                   style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:.78rem;font-family:monospace;border:1px solid #d1d5db;border-radius:4px;" />
+                        </div>
+                        <div>
+                            <label for="moneris-client-secret" style="font-size:.75rem;font-weight:600;display:block;color:#374151;">Application Secret (client_secret)</label>
+                            <input id="moneris-client-secret" type="password" autocomplete="new-password" spellcheck="false"
+                                   placeholder="••••••••••••••••"
+                                   style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:.78rem;font-family:monospace;border:1px solid #d1d5db;border-radius:4px;" />
+                        </div>
+                        <div>
+                            <label for="moneris-merchant-id" style="font-size:.75rem;font-weight:600;display:block;color:#374151;">Merchant ID (X-Merchant-Id)</label>
+                            <input id="moneris-merchant-id" type="text" autocomplete="off" spellcheck="false"
+                                   placeholder="e.g. 0030200110408"
+                                   style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:.78rem;font-family:monospace;border:1px solid #d1d5db;border-radius:4px;" />
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+                            <button id="moneris-save-credentials"
+                                    style="padding:5px 14px;font-size:.78rem;font-weight:600;border:none;border-radius:4px;background:#0891b2;color:#fff;cursor:pointer;">
+                                Save Credentials
+                            </button>
+                            <span id="moneris-cred-status" style="font-size:.75rem;color:#16a34a;"></span>
+                        </div>
+                    </div>
+                </div>
+                <!-- /Moneris Credentials -->
 
                 <!-- ── Moneris iPP320 / P400 Virtual Terminal Display ─────────── -->
                 <div id="moneris-display-section" class="moneris-terminal-wrap" style="display:none;">
