@@ -92,6 +92,20 @@ class PeripheralSimulatorService {
                 } else {
                     console.warn('[SW] No side panel connected — cannot deliver TERMINAL_CHARGE_REQUEST.');
                 }
+            } else if (msg.type === 'SQUARE_POS_MOCK_REQUEST') {
+                // Square POS API (App-Switch) mock: forward to side panel
+                if (this.sidePanelPort) {
+                    this.sidePanelPort.postMessage({
+                        type:        'SQUARE_POS_MOCK_REQUEST',
+                        nonce:       msg.nonce,
+                        amount:      msg.amount,
+                        currency:    msg.currency,
+                        callbackUrl: msg.callbackUrl,
+                        timestamp:   msg.timestamp,
+                    });
+                } else {
+                    console.warn('[SW] No side panel connected — cannot deliver SQUARE_POS_MOCK_REQUEST.');
+                }
             } else if (msg.type === 'TERMINAL_CHARGE_CANCEL') {
                 console.log('[SW] TERMINAL_CHARGE_CANCEL received from content script.');
                 if (this.sidePanelPort) {
@@ -199,6 +213,11 @@ class PeripheralSimulatorService {
                 // Operator clicked Approve / Decline / Timeout in the terminal panel.
                 // Broadcast to all POS content-script ports so TerminalBridge.js resolves.
                 console.log('[SW] Broadcasting TERMINAL_SIMULATE_RESPONSE to all content scripts:', msg);
+                this.broadcastToContentScripts(msg);
+                break;
+            case 'SQUARE_POS_MOCK_RESPONSE':
+                // Square POS API mock: panel operator approved/declined — relay to all content scripts.
+                console.log('[SW] Broadcasting SQUARE_POS_MOCK_RESPONSE to all content scripts:', msg);
                 this.broadcastToContentScripts(msg);
                 break;
             case 'TERMINAL_CHARGE_CANCEL':

@@ -73,6 +73,21 @@ class POSContentScript {
                     timestamp: request.timestamp,
                 }, '*');
             }
+            // ── Square POS API (App-Switch) mock: relay response to POS page ──
+            // The side panel sends SQUARE_POS_MOCK_RESPONSE after the operator
+            // approves/declines. Relay it to the page so SquarePOSForm.vue can
+            // resolve the pending mock flow.
+            if (request.type === 'SQUARE_POS_MOCK_RESPONSE') {
+                window.postMessage({
+                    type:                  'POS_SQUARE_POS_MOCK_RESPONSE',
+                    nonce:                 request.nonce,
+                    outcome:               request.outcome,
+                    transaction_id:        request.transaction_id,
+                    client_transaction_id: request.client_transaction_id,
+                    error_code:            request.error_code,
+                    error_description:     request.error_description,
+                }, '*');
+            }
             // ── SW requests current terminal state (e.g. when side panel connects) ─
             if (request.type === 'REQUEST_TERMINAL_STATE') {
                 this._broadcastTerminalState();
@@ -127,6 +142,24 @@ class POSContentScript {
                     });
                 } else {
                     console.warn('[CS] Cannot forward charge request — not connected to SW.');
+                }
+            }
+
+            // ── Square POS API (App-Switch) mock: forward charge request ────
+            // SquarePOSForm.vue posts POS_SQUARE_POS_MOCK_REQUEST when in mock mode.
+            // We forward it to the service worker, which relays it to the side panel.
+            if (t === 'POS_SQUARE_POS_MOCK_REQUEST') {
+                if (this.port) {
+                    this.port.postMessage({
+                        type:        'SQUARE_POS_MOCK_REQUEST',
+                        nonce:       event.data.nonce,
+                        amount:      event.data.amount,
+                        currency:    event.data.currency,
+                        callbackUrl: event.data.callbackUrl,
+                        timestamp:   event.data.timestamp,
+                    });
+                } else {
+                    console.warn('[CS] Cannot forward Square POS mock request — not connected to SW.');
                 }
             }
 

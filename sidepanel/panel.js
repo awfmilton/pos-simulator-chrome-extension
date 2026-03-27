@@ -435,6 +435,16 @@ class POSSimulatorPanel {
                     console.warn('[PANEL] handleTerminalReadySignal not found — payment-terminal-simulator.js may not have loaded.');
                 }
                 break;
+            // ── Square POS API (App-Switch) mock flow ───────────────
+            case 'SQUARE_POS_MOCK_REQUEST':
+                // A Square POS API mock charge arrived from the POS (bypassing URL scheme).
+                if (typeof window.handleSquarePOSMockRequest === 'function') {
+                    window.handleSquarePOSMockRequest(msg);
+                    this.switchTab('terminal');
+                } else {
+                    console.warn('[PANEL] handleSquarePOSMockRequest not found — payment-terminal-simulator.js may not have loaded.');
+                }
+                break;
         }
     }
 

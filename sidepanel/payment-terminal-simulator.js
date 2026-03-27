@@ -201,6 +201,40 @@
     };
 
     /**
+     * Called by panel.js when a SQUARE_POS_MOCK_REQUEST message arrives from the SW.
+     * Adds the Square POS API app-switch request to the approval queue using the
+     * same shared operator UI as normal terminal charge requests.
+     *
+     * The nonce (instead of payment_intent_id/reader_id) is stored on the req object
+     * so _dispatchResponseDirect() can route the response correctly.
+     *
+     * @param {object} data - { nonce, amount, currency, callbackUrl, timestamp }
+     */
+    window.handleSquarePOSMockRequest = function (data) {
+        const req = {
+            id:        'sqpos_' + Date.now(),
+            gateway:   'square_pos',
+            amount:    typeof data.amount === 'number' ? data.amount.toFixed(2) : (data.amount ?? '0.00'),
+            currency:  data.currency ?? 'CAD',
+            nonce:     data.nonce,
+            orderId:   null,
+            timestamp: new Date().toLocaleTimeString(),
+            // Not used for routing but kept for display consistency
+            payment_intent_id: null,
+            reader_id:         null,
+        };
+
+        state.pendingRequests.push(req);
+        _addLogEntry(req);
+        _refreshButtonState();
+        _updateBadge();
+
+        if (state.debug) {
+            console.log('[TerminalSim] Square POS mock request queued', req);
+        }
+    };
+
+    /**
      * Called by panel.js when a TERMINAL_READY_SIGNAL message arrives from the SW.
      * Updates the connection status light based on whether the POS's configured IP
      * matches this simulator's assigned virtual IP and the terminal is enabled.
@@ -795,6 +829,35 @@
     }
 
     function _dispatchResponseDirect(outcome, method, req) {
+        // ── Square POS API (App-Switch) mock path ─────────────────────────────
+        // These requests use a separate response message type (SQUARE_POS_MOCK_RESPONSE)
+        // so they never collide with the terminal charge flow.
+        if (req.gateway === 'square_pos') {
+            const payload = window.TerminalSimulators.square_pos.buildPayload(outcome, method, req);
+            const response = {
+                type:                  'SQUARE_POS_MOCK_RESPONSE',
+                nonce:                 req.nonce,
+                outcome:               (outcome === 'approved') ? 'approved' : 'declined',
+                transaction_id:        payload.transaction_id,
+                client_transaction_id: payload.client_transaction_id,
+                error_code:            payload.error_code,
+                error_description:     payload.error_description,
+            };
+            if (state.swPort) {
+                state.swPort.postMessage(response);
+                if (state.debug) {
+                    console.log('[TerminalSim] Sent Square POS mock response:', response);
+                }
+            } else {
+                console.error('[TerminalSim] SW port not available — cannot send Square POS response.');
+            }
+            _markLogEntryResolved(req.id, outcome, method);
+            _refreshButtonState();
+            _updateBadge();
+            return;
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         const brand     = state.activeBrand;
         const reference = `${brand}_${method}_${Date.now()}`;
 
