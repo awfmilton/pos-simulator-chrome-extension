@@ -211,8 +211,14 @@ class EscPosParser {
                 if (line.style.bold) classes.push('bold');
                 if (line.style.align) classes.push(line.style.align); // 'left', 'center', 'right'
 
-                // Replace spaces with non-breaking spaces to preserve indentation
-                const text = line.text.replace(/ /g, '&nbsp;');
+                // Escape HTML to prevent XSS, then replace spaces with non-breaking spaces to preserve indentation
+                const escapedText = line.text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+                const text = escapedText.replace(/ /g, '&nbsp;');
                 html += `<div class="${classes.join(' ')}">${text || '&nbsp;'}</div>`;
             }
         });
