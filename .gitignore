@@ -1,0 +1,7 @@
+node_modules/
+
+# Test reports and coverage
+coverage/
+playwright-report/
+test-results/
+.last-run.json
