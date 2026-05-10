@@ -109,27 +109,22 @@ function createUSBDrawerDevice(drawerType, config) {
         opened: false,
 
         open: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.open`);
             return Promise.resolve();
         },
 
         close: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.close`);
             return Promise.resolve();
         },
 
         selectConfiguration: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.selectConfiguration`);
             return Promise.resolve();
         },
 
         claimInterface: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.claimInterface`);
             return Promise.resolve();
         },
 
         transferOut: async function(endpointNumber, data) {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.transferOut - OPENING DRAWER!`);
 
             // Send drawer open command
             window.postMessage({
@@ -155,27 +150,22 @@ function createUSBScaleDevice(scaleType, config) {
         opened: false,
 
         open: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.open`);
             return Promise.resolve();
         },
 
         close: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.close`);
             return Promise.resolve();
         },
 
         selectConfiguration: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.selectConfiguration`);
             return Promise.resolve();
         },
 
         claimInterface: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.claimInterface`);
             return Promise.resolve();
         },
 
         transferIn: async function(endpointNumber, length) {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.transferIn requested ${length} bytes`);
 
             // Get current weight from extension
             const currentWeight = window.posScaleWeight || 0;
@@ -344,12 +334,11 @@ function createUSBPrinterDevice(brand, model, config) {
             productId: 0x0006,
             productName: 'Virtual Line Display',
             opened: false,
-            open: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.open'); return Promise.resolve(); },
-            close: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.close'); return Promise.resolve(); },
-            selectConfiguration: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.selectConfiguration'); return Promise.resolve(); },
-            claimInterface: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.claimInterface'); return Promise.resolve(); },
+            open: async () => { return Promise.resolve(); },
+            close: async () => { return Promise.resolve(); },
+            selectConfiguration: async () => { return Promise.resolve(); },
+            claimInterface: async () => { return Promise.resolve(); },
             transferOut: async function(endpointNumber, data) {
-                console.log(`[Interceptor] FAKE LINEDISPLAY.transferOut with ${data.byteLength} bytes.`);
                 const payloadArray = bufferSourceToByteArray(data);
                 window.postMessage({
                     type: 'POS_SIMULATOR_RAW_DATA',
@@ -459,7 +448,6 @@ function createUSBPrinterDevice(brand, model, config) {
         opened: false,
 
         open: async function() {
-            console.log('[Interceptor] FAKE HID SCALE.open');
             this.opened = true;
 
             // Start sending weight reports
@@ -468,7 +456,6 @@ function createUSBPrinterDevice(brand, model, config) {
         },
 
         close: async function() {
-            console.log('[Interceptor] FAKE HID SCALE.close');
             this.opened = false;
             if (this.reportInterval) {
                 clearInterval(this.reportInterval);
@@ -477,7 +464,6 @@ function createUSBPrinterDevice(brand, model, config) {
         },
 
         sendReport: async function(reportId, data) {
-            console.log(`[Interceptor] FAKE HID SCALE.sendReport ${reportId}`);
 
             // Handle scale commands
             const command = Array.from(new Uint8Array(data));
@@ -538,19 +524,16 @@ function createUSBPrinterDevice(brand, model, config) {
         opened: false,
 
         open: async function() {
-            console.log('[Interceptor] FAKE HID.open');
             this.opened = true;
             return Promise.resolve();
         },
 
         close: async function() {
-            console.log('[Interceptor] FAKE HID.close');
             this.opened = false;
             return Promise.resolve();
         },
 
         sendReport: async function(reportId, data) {
-            console.log(`[Interceptor] FAKE HID.sendReport with ${data.byteLength} bytes`);
             const payloadArray = bufferSourceToByteArray(data);
             window.postMessage({
                 type: 'POS_SIMULATOR_RAW_DATA',
