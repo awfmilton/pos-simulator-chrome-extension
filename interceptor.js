@@ -816,6 +816,8 @@ const serialPrinterPorts = {
         }
     };
 
+    const flattenedSerialPrinterPorts = Object.entries(serialPrinterPorts);
+
     // Enhanced WebSerial port enumeration
     navigator.serial.requestPort = async (options) => {
         console.log('[Serial] Printer port requested:', options);
@@ -825,7 +827,7 @@ const serialPrinterPorts = {
         }
 
         for (const filter of options.filters) {
-            for (const [key, port] of Object.entries(serialPrinterPorts)) {
+            for (const [key, port] of flattenedSerialPrinterPorts) {
                 const info = port.getInfo();
                 if (filter.usbVendorId === info.usbVendorId &&
                     (!filter.usbProductId || filter.usbProductId === info.usbProductId)) {
