@@ -185,3 +185,7 @@ class AAMVAGenerator {
         return this.generate(null, age);
     }
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AAMVAGenerator;
+}
