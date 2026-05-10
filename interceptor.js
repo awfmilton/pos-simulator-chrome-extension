@@ -9,6 +9,32 @@ License: personal use $5/month, business use $100/month
 // This script is injected into the main world to intercept peripheral API calls.
 
 (function() {
+    // A helper to safely convert BufferSource to a byte array
+    function bufferSourceToByteArray(source) {
+        if (source instanceof ArrayBuffer) {
+            return Array.from(new Uint8Array(source));
+        }
+        if (ArrayBuffer.isView(source)) {
+            return Array.from(new Uint8Array(source.buffer, source.byteOffset, source.byteLength));
+        }
+        if (typeof source === 'object' && source !== null && typeof source.length === 'number') {
+            return Array.from(source);
+        }
+        throw new Error('Invalid BufferSource');
+    }
+
+    // Export for testing in Node.js environment early
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            bufferSourceToByteArray
+        };
+    }
+
+    // If running in Jest without window, skip DOM/Browser initialization logic
+    if (typeof window === 'undefined') {
+        return;
+    }
+
     console.log('[interceptor.js] Running in main world.');
 
     window.addEventListener('message', (event) => {
@@ -23,22 +49,6 @@ License: personal use $5/month, business use $100/month
             console.log(`[Interceptor] Updated scale variables:`, {weight: window.posScaleWeight, unit: window.posScaleUnit, stable: window.posScaleStable });
         }
     });
-
-    // A helper to safely convert BufferSource to a byte array
-    function bufferSourceToByteArray(source) {
-        if (source instanceof ArrayBuffer) {
-            return Array.from(new Uint8Array(source));
-        }
-        if (typeof source === 'object' && source !== null && typeof source.length === 'number') {
-            return Array.from(source);
-        }
-        if (ArrayBuffer.isView(source)) {
-            return Array.from(new Uint8Array(source.buffer, source.byteOffset, source.byteLength));
-        }
-        // Fallback for other cases, though less common
-        return Array.from(new Uint8Array(source));
-    }
-
 
     // --- WebUSB Interception ---
     if (!navigator.usb) navigator.usb = {};
@@ -1094,4 +1104,5 @@ window.fetch = async function(resource, config = {}) {
 
 
     console.log('[interceptor.js] All APIs intercepted.');
+
 })();
