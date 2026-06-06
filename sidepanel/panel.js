@@ -95,16 +95,6 @@ class POSSimulatorPanel {
             }
         });
 
-        // MSR events
-        document.getElementById('swipe-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Swipe Card"');
-            this.handleMSRSwipe();
-        });
-        document.getElementById('generate-card-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Generate Test Card"');
-            this.generateTestCard();
-        });
-
         // Printer events
         document.getElementById('test-print-btn').addEventListener('click', () => {
             console.log('[USER-ACTION] Clicked "Test Print"');
