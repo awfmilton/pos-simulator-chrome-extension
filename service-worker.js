@@ -17,6 +17,9 @@ class PeripheralSimulatorService {
         this.contentScriptPorts = new Map();
         this.posUrlPattern = null;
         this.isConnected = false;
+        // Holds a TERMINAL_CHARGE_REQUEST that arrived before the side panel opened.
+        // Delivered immediately when the panel connects; cleared on deliver or cancel.
+        this.pendingChargeRequest = null;
 
         this.init();
     }
@@ -32,9 +35,25 @@ class PeripheralSimulatorService {
             }
         });
 
-        // The onMessage listener is no longer needed for communication with the content
-        // script, as that is now handled by the long-lived port.
-        // We can remove it completely.
+        // Content-script traffic rides the long-lived ports, but two panel
+        // utility scripts (virtual-keyboard.js, receipt-manager.js) still send
+        // one-shot chrome.runtime.sendMessage calls — without this listener
+        // those messages are silently dropped (virtual keyboard dead, email
+        // receipts dead).
+        chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+            if (!msg || !msg.type) return false;
+            if (msg.type === 'KEYBOARD_INPUT') {
+                this.handleKeyboardInput(msg.data);
+                return false;
+            }
+            if (msg.type === 'SEND_EMAIL') {
+                Promise.resolve(this.handleSendEmail(msg.data))
+                    .then((result) => sendResponse(result || { success: true }))
+                    .catch((err) => sendResponse({ success: false, error: err && err.message }));
+                return true; // keep the channel open for the async response
+            }
+            return false;
+        });
 
         chrome.storage.local.get('posSimulatorSettings', (result) => {
             if (result.posSimulatorSettings) {
@@ -58,6 +77,13 @@ class PeripheralSimulatorService {
         this.contentScriptPorts.forEach((csPort) => {
             csPort.postMessage({ type: 'REQUEST_TERMINAL_STATE' });
         });
+
+        // Deliver any charge request that arrived before the panel was open.
+        if (this.pendingChargeRequest) {
+            console.log('[SW] Delivering buffered TERMINAL_CHARGE_REQUEST to newly-connected panel.');
+            port.postMessage(this.pendingChargeRequest);
+            this.pendingChargeRequest = null;
+        }
     }
 
     handleContentScriptConnection(port) {
@@ -79,18 +105,22 @@ class PeripheralSimulatorService {
             } else if (msg.type === 'TERMINAL_CHARGE_REQUEST') {
                 // Forward charge request from POS page → panel terminal simulator
                 console.log('[SW] TERMINAL_CHARGE_REQUEST received from content script:', msg);
+                const chargePayload = {
+                    type:      'TERMINAL_CHARGE_REQUEST',
+                    requestId: msg.requestId,
+                    gateway:   msg.gateway,
+                    amount:    msg.amount,
+                    currency:  msg.currency,
+                    orderId:   msg.orderId,
+                    timestamp: msg.timestamp,
+                };
                 if (this.sidePanelPort) {
-                    this.sidePanelPort.postMessage({
-                        type:      'TERMINAL_CHARGE_REQUEST',
-                        requestId: msg.requestId,
-                        gateway:   msg.gateway,
-                        amount:    msg.amount,
-                        currency:  msg.currency,
-                        orderId:   msg.orderId,
-                        timestamp: msg.timestamp,
-                    });
+                    this.sidePanelPort.postMessage(chargePayload);
                 } else {
-                    console.warn('[SW] No side panel connected — cannot deliver TERMINAL_CHARGE_REQUEST.');
+                    // Buffer the request — it will be delivered when the operator opens
+                    // the side panel (up to 2 minutes, the POS timeout window).
+                    console.warn('[SW] No side panel connected — buffering TERMINAL_CHARGE_REQUEST until panel opens.');
+                    this.pendingChargeRequest = chargePayload;
                 }
             } else if (msg.type === 'SQUARE_POS_MOCK_REQUEST') {
                 // Square POS API (App-Switch) mock: forward to side panel
@@ -108,6 +138,7 @@ class PeripheralSimulatorService {
                 }
             } else if (msg.type === 'TERMINAL_CHARGE_CANCEL') {
                 console.log('[SW] TERMINAL_CHARGE_CANCEL received from content script.');
+                this.pendingChargeRequest = null; // discard any buffered request
                 if (this.sidePanelPort) {
                     this.sidePanelPort.postMessage({ type: 'TERMINAL_CHARGE_CANCEL' });
                 }

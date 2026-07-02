@@ -682,13 +682,15 @@ class POSSimulatorPanel {
         const swipeData = {
             track1: track1,
             track2: track2,
-            cardType: cardTypeSelect.value
+            cardType: cardTypeSelect.value,
+            timestamp: Date.now()
         };
 
         this.updateStatus('Swiping card...');
 
         try {
-            await this.sendMessage('SWIPE_MSR', swipeData);
+            // NOTE: the service worker's handler case is 'MSR_SWIPE'
+            await this.sendMessage('MSR_SWIPE', swipeData);
             this.logActivity('msr', `Card swiped: ${cardTypeSelect.value}`);
             this.updateStatus('Card swiped successfully');
 
