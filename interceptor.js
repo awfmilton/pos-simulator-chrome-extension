@@ -1,15 +1,21 @@
 /*
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
-*/
+ * tbay.tk Virtual Peripheral Simulator
+ * Developed by: Alexander Milton — https://tbay.tk
+ */
 // interceptor.js
 // This script is injected into the main world to intercept peripheral API calls.
 
 (function() {
-    console.log('[interceptor.js] Running in main world.');
+    // ── Verbose-logging gate ──────────────────────────────────────────────────
+    // Runs in the POS page's main world; reads the operator debug toggle from
+    // the page localStorage. console.warn/error are never gated.
+    function _icDebug() {
+        try { return localStorage.getItem('terminal_debug_enabled') === '1'; }
+        catch (e) { return false; }
+    }
+    function dlog(...args) { if (_icDebug()) console.log(...args); }
+
+    dlog('[interceptor.js] Running in main world.');
 
     window.addEventListener('message', (event) => {
         if (!event.data || !event.data.type) {
@@ -20,7 +26,7 @@ License: personal use $5/month, business use $100/month
             window.posScaleWeight = event.data.weight;
             window.posScaleUnit = event.data.unit;
             window.posScaleStable = event.data.stable;
-            console.log(`[Interceptor] Updated scale variables:`, {weight: window.posScaleWeight, unit: window.posScaleUnit, stable: window.posScaleStable });
+            dlog(`[Interceptor] Updated scale variables:`, {weight: window.posScaleWeight, unit: window.posScaleUnit, stable: window.posScaleStable });
         }
     });
 
@@ -109,27 +115,27 @@ function createUSBDrawerDevice(drawerType, config) {
         opened: false,
 
         open: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.open`);
+            dlog(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.open`);
             return Promise.resolve();
         },
 
         close: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.close`);
+            dlog(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.close`);
             return Promise.resolve();
         },
 
         selectConfiguration: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.selectConfiguration`);
+            dlog(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.selectConfiguration`);
             return Promise.resolve();
         },
 
         claimInterface: async () => {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.claimInterface`);
+            dlog(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.claimInterface`);
             return Promise.resolve();
         },
 
         transferOut: async function(endpointNumber, data) {
-            console.log(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.transferOut - OPENING DRAWER!`);
+            dlog(`[Interceptor] FAKE ${drawerType.toUpperCase()} DRAWER.transferOut - OPENING DRAWER!`);
 
             // Send drawer open command
             window.postMessage({
@@ -155,27 +161,27 @@ function createUSBScaleDevice(scaleType, config) {
         opened: false,
 
         open: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.open`);
+            dlog(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.open`);
             return Promise.resolve();
         },
 
         close: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.close`);
+            dlog(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.close`);
             return Promise.resolve();
         },
 
         selectConfiguration: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.selectConfiguration`);
+            dlog(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.selectConfiguration`);
             return Promise.resolve();
         },
 
         claimInterface: async () => {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.claimInterface`);
+            dlog(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.claimInterface`);
             return Promise.resolve();
         },
 
         transferIn: async function(endpointNumber, length) {
-            console.log(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.transferIn requested ${length} bytes`);
+            dlog(`[Interceptor] FAKE ${scaleType.toUpperCase()} SCALE.transferIn requested ${length} bytes`);
 
             // Get current weight from extension
             const currentWeight = window.posScaleWeight || 0;
@@ -275,29 +281,29 @@ function createUSBPrinterDevice(brand, model, config) {
         }],
 
         open: async function() {
-            console.log(`[USB] Opening ${brand} ${model} printer`);
+            dlog(`[USB] Opening ${brand} ${model} printer`);
             this.opened = true;
             return Promise.resolve();
         },
 
         close: async function() {
-            console.log(`[USB] Closing ${brand} ${model} printer`);
+            dlog(`[USB] Closing ${brand} ${model} printer`);
             this.opened = false;
             return Promise.resolve();
         },
 
         selectConfiguration: async function(configValue) {
-            console.log(`[USB] Selecting configuration ${configValue}`);
+            dlog(`[USB] Selecting configuration ${configValue}`);
             return Promise.resolve();
         },
 
         claimInterface: async function(interfaceNumber) {
-            console.log(`[USB] Claiming interface ${interfaceNumber}`);
+            dlog(`[USB] Claiming interface ${interfaceNumber}`);
             return Promise.resolve();
         },
 
         transferOut: async function(endpointNumber, data) {
-            console.log(`[USB] ${brand} printer receiving ${data.byteLength} bytes on endpoint ${endpointNumber}`);
+            dlog(`[USB] ${brand} printer receiving ${data.byteLength} bytes on endpoint ${endpointNumber}`);
 
             const payloadArray = bufferSourceToByteArray(data);
             window.postMessage({
@@ -316,7 +322,7 @@ function createUSBPrinterDevice(brand, model, config) {
         },
 
         transferIn: async function(endpointNumber, length) {
-            console.log(`[USB] ${brand} printer status request on endpoint ${endpointNumber}`);
+            dlog(`[USB] ${brand} printer status request on endpoint ${endpointNumber}`);
             // Return printer status (online, no errors)
             const statusData = new Uint8Array([0x12, 0x00, 0x00, 0x00]); // Online status
             return Promise.resolve({
@@ -344,12 +350,12 @@ function createUSBPrinterDevice(brand, model, config) {
             productId: 0x0006,
             productName: 'Virtual Line Display',
             opened: false,
-            open: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.open'); return Promise.resolve(); },
-            close: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.close'); return Promise.resolve(); },
-            selectConfiguration: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.selectConfiguration'); return Promise.resolve(); },
-            claimInterface: async () => { console.log('[Interceptor] FAKE LINEDISPLAY.claimInterface'); return Promise.resolve(); },
+            open: async () => { dlog('[Interceptor] FAKE LINEDISPLAY.open'); return Promise.resolve(); },
+            close: async () => { dlog('[Interceptor] FAKE LINEDISPLAY.close'); return Promise.resolve(); },
+            selectConfiguration: async () => { dlog('[Interceptor] FAKE LINEDISPLAY.selectConfiguration'); return Promise.resolve(); },
+            claimInterface: async () => { dlog('[Interceptor] FAKE LINEDISPLAY.claimInterface'); return Promise.resolve(); },
             transferOut: async function(endpointNumber, data) {
-                console.log(`[Interceptor] FAKE LINEDISPLAY.transferOut with ${data.byteLength} bytes.`);
+                dlog(`[Interceptor] FAKE LINEDISPLAY.transferOut with ${data.byteLength} bytes.`);
                 const payloadArray = bufferSourceToByteArray(data);
                 window.postMessage({
                     type: 'POS_SIMULATOR_RAW_DATA',
@@ -377,7 +383,7 @@ function createUSBPrinterDevice(brand, model, config) {
 
     // Enhanced WebUSB device enumeration
     navigator.usb.requestDevice = async (options) => {
-        console.log('[USB] Printer device requested with filters:', options);
+        dlog('[USB] Printer device requested with filters:', options);
 
         if (options && options.filters) {
             for (const filter of options.filters) {
@@ -386,7 +392,7 @@ function createUSBPrinterDevice(brand, model, config) {
                     for (const [model, config] of Object.entries(models)) {
                         if (filter.vendorId === config.vendorId &&
                             (!filter.productId || filter.productId === config.productId)) {
-                            console.log(`[USB] Returning ${brand} ${model} printer`);
+                            dlog(`[USB] Returning ${brand} ${model} printer`);
                             return Promise.resolve(createUSBPrinterDevice(brand, model, config));
                         }
                     }
@@ -395,20 +401,20 @@ function createUSBPrinterDevice(brand, model, config) {
                 // Check for cash drawers
                 if (drawerUSBDevices.has(filter.vendorId)) {
                     const drawer = drawerUSBDevices.get(filter.vendorId);
-                    console.log(`[Interceptor] Cash Drawer detected. Returning virtual drawer device.`);
+                    dlog(`[Interceptor] Cash Drawer detected. Returning virtual drawer device.`);
                     return Promise.resolve(drawer);
                 }
 
                 // Check for scales
                 if (scaleUSBDevices.has(filter.vendorId)) {
                     const scale = scaleUSBDevices.get(filter.vendorId);
-                    console.log(`[Interceptor] Scale detected. Returning virtual scale device.`);
+                    dlog(`[Interceptor] Scale detected. Returning virtual scale device.`);
                     return Promise.resolve(scale);
                 }
 
                 // Line display detection
                 if (filter.vendorId === devices.lineDisplay.vendorId) {
-                    console.log('[Interceptor] Line Display requested. Returning virtual line display.');
+                    dlog('[Interceptor] Line Display requested. Returning virtual line display.');
                     return Promise.resolve(devices.lineDisplay);
                 }
             }
@@ -416,7 +422,7 @@ function createUSBPrinterDevice(brand, model, config) {
 
         if (!options?.filters?.length) {
             // Return default printer if no filters
-            console.log('[USB] No filters provided, returning default Epson printer.');
+            dlog('[USB] No filters provided, returning default Epson printer.');
             return Promise.resolve(createUSBPrinterDevice('epson', 'tm_t88vi', printerUSBDevices.epson.tm_t88vi));
         }
 
@@ -424,7 +430,7 @@ function createUSBPrinterDevice(brand, model, config) {
     };
 
     navigator.usb.getDevices = async () => {
-        console.log('[USB] Enumerating available printer devices');
+        dlog('[USB] Enumerating available printer devices');
         const allDevices = [];
 
         // Add all printer models
@@ -459,7 +465,7 @@ function createUSBPrinterDevice(brand, model, config) {
         opened: false,
 
         open: async function() {
-            console.log('[Interceptor] FAKE HID SCALE.open');
+            dlog('[Interceptor] FAKE HID SCALE.open');
             this.opened = true;
 
             // Start sending weight reports
@@ -468,7 +474,7 @@ function createUSBPrinterDevice(brand, model, config) {
         },
 
         close: async function() {
-            console.log('[Interceptor] FAKE HID SCALE.close');
+            dlog('[Interceptor] FAKE HID SCALE.close');
             this.opened = false;
             if (this.reportInterval) {
                 clearInterval(this.reportInterval);
@@ -477,13 +483,13 @@ function createUSBPrinterDevice(brand, model, config) {
         },
 
         sendReport: async function(reportId, data) {
-            console.log(`[Interceptor] FAKE HID SCALE.sendReport ${reportId}`);
+            dlog(`[Interceptor] FAKE HID SCALE.sendReport ${reportId}`);
 
             // Handle scale commands
             const command = Array.from(new Uint8Array(data));
             if (command[0] === 0x02) { // Tare command
                 window.posScaleWeight = 0;
-                console.log('[Interceptor] Scale tared via HID');
+                dlog('[Interceptor] Scale tared via HID');
             }
 
             return Promise.resolve();
@@ -538,19 +544,19 @@ function createUSBPrinterDevice(brand, model, config) {
         opened: false,
 
         open: async function() {
-            console.log('[Interceptor] FAKE HID.open');
+            dlog('[Interceptor] FAKE HID.open');
             this.opened = true;
             return Promise.resolve();
         },
 
         close: async function() {
-            console.log('[Interceptor] FAKE HID.close');
+            dlog('[Interceptor] FAKE HID.close');
             this.opened = false;
             return Promise.resolve();
         },
 
         sendReport: async function(reportId, data) {
-            console.log(`[Interceptor] FAKE HID.sendReport with ${data.byteLength} bytes`);
+            dlog(`[Interceptor] FAKE HID.sendReport with ${data.byteLength} bytes`);
             const payloadArray = bufferSourceToByteArray(data);
             window.postMessage({
                 type: 'POS_SIMULATOR_RAW_DATA',
@@ -563,26 +569,26 @@ function createUSBPrinterDevice(brand, model, config) {
     };
 
     navigator.hid.requestDevice = async (options) => {
-        console.log('[Interceptor] Intercepted navigator.hid.requestDevice with options:', options);
+        dlog('[Interceptor] Intercepted navigator.hid.requestDevice with options:', options);
         if (options && options.filters) {
             for (const filter of options.filters) {
                 if (filter.vendorId === 0x0922 && filter.productId === 0x8003) {
-                    console.log('[Interceptor] HID Scale requested. Returning virtual scale.');
+                    dlog('[Interceptor] HID Scale requested. Returning virtual scale.');
                     return Promise.resolve([fakeHIDScaleDevice]);
                 }
                 if (filter.vendorId === 0x1504 && filter.productId === 0x0006) {
-                    console.log('[Interceptor] HID Line Display requested. Returning virtual display.');
+                    dlog('[Interceptor] HID Line Display requested. Returning virtual display.');
                     return Promise.resolve([fakeHIDDevice]);
                 }
             }
         }
         // Default or fallback
-        console.log('[Interceptor] No specific HID filter match, returning default Line Display.');
+        dlog('[Interceptor] No specific HID filter match, returning default Line Display.');
         return Promise.resolve([fakeHIDDevice]);
     };
 
     navigator.hid.getDevices = async () => {
-        console.log('[Interceptor] Intercepted navigator.hid.getDevices');
+        dlog('[Interceptor] Intercepted navigator.hid.getDevices');
         return Promise.resolve([fakeHIDDevice, fakeHIDScaleDevice]);
     };
 
@@ -603,15 +609,15 @@ function createSerialPrinterPort(brand, model, config) {
         writable: null,
 
         open: async function(options = {}) {
-            console.log(`[Serial] Opening ${brand} ${model} on COM port`);
-            console.log('[Serial] Port options:', options);
+            dlog(`[Serial] Opening ${brand} ${model} on COM port`);
+            dlog('[Serial] Port options:', options);
 
             this.opened = true;
 
             // Create writable stream for ESC/POS commands
             this.writable = new WritableStream({
                 write: (chunk) => {
-                    console.log(`[Serial] ${brand} printer receiving ${chunk.byteLength} bytes`);
+                    dlog(`[Serial] ${brand} printer receiving ${chunk.byteLength} bytes`);
 
                     const payloadArray = bufferSourceToByteArray(chunk);
                     window.postMessage({
@@ -625,14 +631,14 @@ function createSerialPrinterPort(brand, model, config) {
                 },
 
                 close: () => {
-                    console.log(`[Serial] ${brand} printer write stream closed`);
+                    dlog(`[Serial] ${brand} printer write stream closed`);
                 }
             });
 
             // Create readable stream for printer status
             this.readable = new ReadableStream({
                 start: (controller) => {
-                    console.log(`[Serial] ${brand} printer readable stream started`);
+                    dlog(`[Serial] ${brand} printer readable stream started`);
 
                     // Send initial ready status
                     setTimeout(() => {
@@ -658,7 +664,7 @@ function createSerialPrinterPort(brand, model, config) {
         },
 
         close: async function() {
-            console.log(`[Serial] Closing ${brand} ${model}`);
+            dlog(`[Serial] Closing ${brand} ${model}`);
             this.opened = false;
             if (this.statusInterval) {
                 clearInterval(this.statusInterval);
@@ -687,22 +693,22 @@ const serialPrinterPorts = {
         readable: null,
 
         open: async function(options) {
-            console.log('[Interceptor] Enhanced serial port opening for scale with options:', options);
+            dlog('[Interceptor] Enhanced serial port opening for scale with options:', options);
             this.opened = true;
 
             // Create writable stream for commands to scale
             this.writable = new WritableStream({
                 write(chunk) {
                     const command = new TextDecoder().decode(chunk);
-                    console.log('[Interceptor] Scale command received:', command);
+                    dlog('[Interceptor] Scale command received:', command);
 
                     // Handle common scale commands
                     if (command.includes('W') || command.includes('weight')) {
                         // Weight request - respond via readable stream
-                        console.log('[Interceptor] Weight request received');
+                        dlog('[Interceptor] Weight request received');
                     } else if (command.includes('Z') || command.includes('zero')) {
                         window.posScaleWeight = 0;
-                        console.log('[Interceptor] Scale zeroed via serial');
+                        dlog('[Interceptor] Scale zeroed via serial');
                     }
 
                     window.postMessage({
@@ -730,7 +736,7 @@ const serialPrinterPorts = {
                         try {
                             controller.enqueue(new Uint8Array(responseBytes));
                         } catch (error) {
-                            console.log('[Interceptor] Scale readable stream closed');
+                            dlog('[Interceptor] Scale readable stream closed');
                             clearInterval(weightInterval);
                         }
                     };
@@ -776,7 +782,7 @@ const serialPrinterPorts = {
         readable: null,
 
         open: async function(options) {
-            console.log('[Interceptor] Enhanced serial port opening with options:', options);
+            dlog('[Interceptor] Enhanced serial port opening with options:', options);
             this.opened = true;
 
             // Create enhanced writable stream that handles line display commands
@@ -786,7 +792,7 @@ const serialPrinterPorts = {
 
                     // Check if it's a line display command pattern
                     const hex = Array.from(payloadArray).map(b => b.toString(16).padStart(2, '0')).join('');
-                    console.log('[Interceptor] Serial command:', hex);
+                    dlog('[Interceptor] Serial command:', hex);
 
                     window.postMessage({
                         type: 'POS_SIMULATOR_RAW_DATA',
@@ -818,7 +824,7 @@ const serialPrinterPorts = {
 
     // Enhanced WebSerial port enumeration
     navigator.serial.requestPort = async (options) => {
-        console.log('[Serial] Printer port requested:', options);
+        dlog('[Serial] Printer port requested:', options);
 
         if (!options?.filters?.length) {
             return Promise.resolve(serialPrinterPorts.epson_tm_t88vi);
@@ -829,18 +835,18 @@ const serialPrinterPorts = {
                 const info = port.getInfo();
                 if (filter.usbVendorId === info.usbVendorId &&
                     (!filter.usbProductId || filter.usbProductId === info.usbProductId)) {
-                    console.log(`[Serial] Returning ${key} printer port`);
+                    dlog(`[Serial] Returning ${key} printer port`);
                     return Promise.resolve(port);
                 }
             }
              // Check for scale
             if (filter.usbVendorId === 0x10C4 && filter.usbProductId === 0xEA60) {
-                    console.log('[Interceptor] Serial Scale requested. Returning virtual scale port.');
+                    dlog('[Interceptor] Serial Scale requested. Returning virtual scale port.');
                     return Promise.resolve(fakeSerialScalePort);
             }
             // Check for line display
             if (filter.usbVendorId === 0x1504 && filter.usbProductId === 0x0006) {
-                    console.log('[Interceptor] Serial Line Display requested. Returning virtual display port.');
+                    dlog('[Interceptor] Serial Line Display requested. Returning virtual display port.');
                     return Promise.resolve(enhancedFakeSerialPort);
             }
         }
@@ -849,7 +855,7 @@ const serialPrinterPorts = {
     };
 
     navigator.serial.getPorts = async () => {
-        console.log('[Serial] Enumerating available printer ports');
+        dlog('[Serial] Enumerating available printer ports');
         const existingPorts = [enhancedFakeSerialPort, fakeSerialScalePort];
         const printerPorts = Object.values(serialPrinterPorts);
         return Promise.resolve([...existingPorts, ...printerPorts]);
@@ -890,7 +896,7 @@ function createBluetoothPrinterDevice(brand, model) {
         },
 
         writeValue: async function(value) {
-            console.log(`[Bluetooth] ${brand} printer receiving ${value.byteLength} bytes`);
+            dlog(`[Bluetooth] ${brand} printer receiving ${value.byteLength} bytes`);
 
             const payloadArray = bufferSourceToByteArray(value);
             window.postMessage({
@@ -935,18 +941,18 @@ function createBluetoothPrinterDevice(brand, model) {
         connected: false,
 
         connect: async function() {
-            console.log(`[Bluetooth] Connecting to ${brand} ${model}`);
+            dlog(`[Bluetooth] Connecting to ${brand} ${model}`);
             this.connected = true;
             return Promise.resolve(this);
         },
 
         disconnect: function() {
-            console.log(`[Bluetooth] Disconnecting from ${brand} ${model}`);
+            dlog(`[Bluetooth] Disconnecting from ${brand} ${model}`);
             this.connected = false;
         },
 
         getPrimaryService: async function(serviceUuid) {
-            console.log(`[Bluetooth] Service requested: ${serviceUuid}`);
+            dlog(`[Bluetooth] Service requested: ${serviceUuid}`);
             // For compatibility, we'll return the print service even if the UUID doesn't match.
             // This handles cases where the POS might be using a proprietary or different standard UUID.
             if (serviceUuid !== bluetoothPrinterServices.PRINT_SERVICE) {
@@ -966,7 +972,7 @@ function createBluetoothPrinterDevice(brand, model) {
 // that aborts the rest of the interceptor IIFE (mirrors the usb/hid/serial guards).
 if (!navigator.bluetooth) navigator.bluetooth = {};
 navigator.bluetooth.requestDevice = async (options) => {
-    console.log('[Bluetooth] Printer device requested:', options);
+    dlog('[Bluetooth] Printer device requested:', options);
 
     // Check if requesting printer services
     const printerServiceRequested = options?.filters?.some(filter =>
@@ -1048,8 +1054,8 @@ window.fetch = async function(resource, config = {}) {
     const interceptTarget = classifyInterceptTarget(url);
 
     if (interceptTarget === 'printer') {
-        console.log(`[Network] Intercepted printer call to: ${url}`);
-        console.log('[Network] Request config:', config);
+        dlog(`[Network] Intercepted printer call to: ${url}`);
+        dlog('[Network] Request config:', config);
 
         let payload = '';
         let contentType = 'application/octet-stream';
@@ -1106,7 +1112,7 @@ window.fetch = async function(resource, config = {}) {
 
         // Check for drawer commands via network (exact same-origin pathname only)
         if (interceptTarget === 'drawer') {
-            console.log(`[Interceptor] Intercepted drawer network call to: ${url}`);
+            dlog(`[Interceptor] Intercepted drawer network call to: ${url}`);
 
             // Send drawer command
             window.postMessage({
@@ -1128,5 +1134,5 @@ window.fetch = async function(resource, config = {}) {
 };
 
 
-    console.log('[interceptor.js] All APIs intercepted.');
+    dlog('[interceptor.js] All APIs intercepted.');
 })();

@@ -1,10 +1,7 @@
 /*
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
-*/
+ * tbay.tk Virtual Peripheral Simulator
+ * Developed by: Alexander Milton — https://tbay.tk
+ */
 
 // Virtual Keyboard Module
 // Simulates HID keyboard input for POS systems

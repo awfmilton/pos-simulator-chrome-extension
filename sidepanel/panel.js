@@ -1,12 +1,21 @@
 /*
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
-*/
+ * tbay.tk Virtual Peripheral Simulator
+ * Developed by: Alexander Milton — https://tbay.tk
+ */
 // POS Peripheral Simulator - Panel JavaScript
 // Handles UI interactions and communication with service worker
+
+// ── Verbose-logging gate ─────────────────────────────────────────────────────
+// Panel traces are gated behind the "Debug Mode" toggle (Settings modal,
+// #debug-mode, persisted as posSimulatorSettings.debugMode). console.warn/error
+// are never gated. dlog() reads the live checkbox state at call time.
+function _panelDebug() {
+    try {
+        const el = document.getElementById('debug-mode');
+        return !!(el && el.checked);
+    } catch (e) { return false; }
+}
+function dlog(...args) { if (_panelDebug()) console.log(...args); }
 
 class POSSimulatorPanel {
     constructor() {
@@ -56,19 +65,19 @@ class POSSimulatorPanel {
     }
 
     init() {
-        console.log('[PANEL] POS Simulator Panel initialized');
+        dlog('[PANEL] POS Simulator Panel initialized');
         this.setupEventListeners();
         this.initializeUI();
         this.connectToServiceWorker();
     }
 
     setupEventListeners() {
-        console.log('[PANEL] Setting up event listeners...');
+        dlog('[PANEL] Setting up event listeners...');
         // Tab navigation
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const tabName = e.currentTarget.dataset.tab;
-                console.log(`[USER-ACTION] Clicked tab: ${tabName}`);
+                dlog(`[USER-ACTION] Clicked tab: ${tabName}`);
                 this.switchTab(tabName);
             });
         });
@@ -81,37 +90,37 @@ class POSSimulatorPanel {
 
         // Barcode scanner events
         document.getElementById('scan-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Scan Barcode"');
+            dlog('[USER-ACTION] Clicked "Scan Barcode"');
             this.handleBarcodeScans();
         });
         document.getElementById('generate-barcode-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Generate Test Barcode"');
+            dlog('[USER-ACTION] Clicked "Generate Test Barcode"');
             this.generateTestBarcode();
         });
         document.getElementById('barcode-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                console.log('[USER-ACTION] Pressed Enter in barcode input');
+                dlog('[USER-ACTION] Pressed Enter in barcode input');
                 this.handleBarcodeScans();
             }
         });
 
         // Printer events
         document.getElementById('test-print-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Test Print"');
+            dlog('[USER-ACTION] Clicked "Test Print"');
             this.handleTestPrint();
         });
         document.getElementById('clear-receipt-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Clear Receipt"');
+            dlog('[USER-ACTION] Clicked "Clear Receipt"');
             this.clearReceipt();
         });
 
         // Cash drawer events
         document.getElementById('open-drawer-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Open Drawer"');
+            dlog('[USER-ACTION] Clicked "Open Drawer"');
             this.handleDrawerOpen();
         });
         document.getElementById('close-drawer-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Close Drawer"');
+            dlog('[USER-ACTION] Clicked "Close Drawer"');
             this.handleDrawerClose();
         });
 
@@ -119,25 +128,25 @@ class POSSimulatorPanel {
         document.getElementById('weight-input').addEventListener('input', (e) => this.updateWeight(e.target.value));
         document.getElementById('weight-slider-input').addEventListener('input', (e) => this.updateWeight(e.target.value));
         document.getElementById('weight-unit-select').addEventListener('change', (e) => {
-            console.log(`[USER-ACTION] Changed weight unit to: ${e.target.value}`);
+            dlog(`[USER-ACTION] Changed weight unit to: ${e.target.value}`);
             this.updateWeightUnit(e.target.value);
         });
         document.getElementById('tare-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Tare"');
+            dlog('[USER-ACTION] Clicked "Tare"');
             this.tareScale();
         });
         document.getElementById('zero-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Zero"');
+            dlog('[USER-ACTION] Clicked "Zero"');
             this.zeroScale();
         });
 
         // Line display events
         document.getElementById('update-display-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Update Display"');
+            dlog('[USER-ACTION] Clicked "Update Display"');
             this.updateLineDisplay();
         });
         document.getElementById('clear-display-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Clear Display"');
+            dlog('[USER-ACTION] Clicked "Clear Display"');
             this.clearLineDisplay();
         });
         document.getElementById('line1-input').addEventListener('input', (e) => this.updateDisplayPreview());
@@ -149,31 +158,31 @@ class POSSimulatorPanel {
 
         // Global controls
         document.getElementById('reset-all-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Reset All"');
+            dlog('[USER-ACTION] Clicked "Reset All"');
             this.resetAll();
         });
         document.getElementById('settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Settings"');
+            dlog('[USER-ACTION] Clicked "Settings"');
             this.showSettings();
         });
 
         // Settings modal
         document.getElementById('close-settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Close Settings"');
+            dlog('[USER-ACTION] Clicked "Close Settings"');
             this.hideSettings();
         });
         document.getElementById('save-settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Save Settings"');
+            dlog('[USER-ACTION] Clicked "Save Settings"');
             this.saveSettings();
         });
         document.getElementById('cancel-settings-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Cancel Settings"');
+            dlog('[USER-ACTION] Clicked "Cancel Settings"');
             this.hideSettings();
         });
         
         // Theme selection
         document.getElementById('theme-preset-select').addEventListener('change', (e) => {
-            console.log(`[USER-ACTION] Changed theme to: ${e.target.value}`);
+            dlog(`[USER-ACTION] Changed theme to: ${e.target.value}`);
             this.applyTheme(e.target.value);
             this.updateThemePreview(e.target.value);
             this.saveTheme(e.target.value); // Auto-save theme changes
@@ -181,12 +190,12 @@ class POSSimulatorPanel {
 
         // Add to setupEventListeners method:
         document.getElementById('generate-dl-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Generate DL"');
+            dlog('[USER-ACTION] Clicked "Generate DL"');
             this.generateSpecificAAMVA('DL');
         });
 
         document.getElementById('generate-id-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Generate ID"');
+            dlog('[USER-ACTION] Clicked "Generate ID"');
             this.generateSpecificAAMVA('ID');
         });
 
@@ -203,19 +212,19 @@ class POSSimulatorPanel {
         // Virtual Keyboard events
         document.querySelectorAll('input[name="keyboard-mode"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
-                console.log(`[USER-ACTION] Changed keyboard mode to: ${e.target.value}`);
+                dlog(`[USER-ACTION] Changed keyboard mode to: ${e.target.value}`);
                 this.setKeyboardMode(e.target.value);
             });
         });
 
         document.getElementById('type-text-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Type Text"');
+            dlog('[USER-ACTION] Clicked "Type Text"');
             this.typeTextFromInput();
         });
 
         document.getElementById('keyboard-text-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                console.log('[USER-ACTION] Pressed Enter in keyboard text input');
+                dlog('[USER-ACTION] Pressed Enter in keyboard text input');
                 this.typeTextFromInput();
             }
         });
@@ -238,79 +247,79 @@ class POSSimulatorPanel {
         document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const mode = e.currentTarget.dataset.mode;
-                console.log(`[USER-ACTION] Switched to payment mode: ${mode}`);
+                dlog(`[USER-ACTION] Switched to payment mode: ${mode}`);
                 this.switchPaymentMode(mode);
             });
         });
 
         // Credit Card Provider selection
         document.getElementById('cc-provider').addEventListener('change', (e) => {
-            console.log(`[USER-ACTION] Changed card provider to: ${e.target.value}`);
+            dlog(`[USER-ACTION] Changed card provider to: ${e.target.value}`);
             this.updateCardProvider(e.target.value);
         });
 
         // Update MSR events to work with new credit card system
         document.getElementById('swipe-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Swipe Card"');
+            dlog('[USER-ACTION] Clicked "Swipe Card"');
             this.handleCardSwipe();
         });
 
         document.getElementById('generate-card-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Generate Card"');
+            dlog('[USER-ACTION] Clicked "Generate Card"');
             this.generateCreditCard();
         });
 
         // Tap to Pay events
         document.getElementById('simulate-tap-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Simulate Tap"');
+            dlog('[USER-ACTION] Clicked "Simulate Tap"');
             this.simulateTapPayment();
         });
 
         document.getElementById('nfc-enable-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Enable NFC"');
+            dlog('[USER-ACTION] Clicked "Enable NFC"');
             this.toggleNFC();
         });
 
         document.getElementById('tap-area').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked tap area');
+            dlog('[USER-ACTION] Clicked tap area');
             this.simulateTapPayment();
         });
 
         // Chip Payment events
         document.getElementById('insert-chip-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Insert Card"');
+            dlog('[USER-ACTION] Clicked "Insert Card"');
             this.insertChipCard();
         });
 
         document.getElementById('remove-chip-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Remove Card"');
+            dlog('[USER-ACTION] Clicked "Remove Card"');
             this.removeChipCard();
         });
 
         // Stripe Integration events
         document.getElementById('stripe-connect-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Connect Stripe"');
+            dlog('[USER-ACTION] Clicked "Connect Stripe"');
             this.connectStripe();
         });
 
         document.getElementById('stripe-payment-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Process Payment"');
+            dlog('[USER-ACTION] Clicked "Process Payment"');
             this.processStripePayment();
         });
 
         // Receipt Management events
         document.getElementById('download-receipt-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Download Receipt"');
+            dlog('[USER-ACTION] Clicked "Download Receipt"');
             this.downloadReceipt();
         });
 
         document.getElementById('email-receipt-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Email Receipt"');
+            dlog('[USER-ACTION] Clicked "Email Receipt"');
             this.emailReceipt();
         });
 
         document.getElementById('email-config-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Email Settings"');
+            dlog('[USER-ACTION] Clicked "Email Settings"');
             this.showEmailConfig();
         });
 
@@ -320,12 +329,12 @@ class POSSimulatorPanel {
         });
 
         document.getElementById('save-email-config-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Save Email Configuration"');
+            dlog('[USER-ACTION] Clicked "Save Email Configuration"');
             this.saveEmailConfig();
         });
 
         document.getElementById('test-email-btn').addEventListener('click', () => {
-            console.log('[USER-ACTION] Clicked "Send Test Email"');
+            dlog('[USER-ACTION] Clicked "Send Test Email"');
             this.sendTestEmail();
         });
 
@@ -342,7 +351,7 @@ class POSSimulatorPanel {
     }
 
     connectToServiceWorker() {
-        console.log('[PANEL] Connecting to service worker...');
+        dlog('[PANEL] Connecting to service worker...');
         this.port = chrome.runtime.connect({ name: 'sidepanel' });
 
         this.port.onMessage.addListener((msg) => this.handlePortMessage(msg));
@@ -372,12 +381,12 @@ class POSSimulatorPanel {
         // Initialise the payment terminal simulator module with the SW port
         if (typeof window.initPaymentTerminalSimulator === 'function') {
             window.initPaymentTerminalSimulator(this.port);
-            console.log('[PANEL] Payment Terminal Simulator initialized.');
+            dlog('[PANEL] Payment Terminal Simulator initialized.');
         }
     }
 
     handlePortMessage(msg) {
-        console.log('[PANEL] Received message from service worker:', msg);
+        dlog('[PANEL] Received message from service worker:', msg);
         switch (msg.type) {
             case 'PRINTER_STATE_UPDATE':
                 this.updatePrinterStateUI(msg.printerType, msg.state);
@@ -399,7 +408,7 @@ class POSSimulatorPanel {
                 this.flashScaleIndicator();
                 break;
             case 'DRAWER_COMMAND_RECEIVED':
-                console.log('[PANEL] Direct drawer command received:', msg);
+                dlog('[PANEL] Direct drawer command received:', msg);
                 this.logActivity('drawer', `Direct drawer command from ${msg.source} (${msg.drawerType || 'unknown'})`);
                 this.triggerDrawerOpen(msg.source);
 
@@ -504,7 +513,7 @@ class POSSimulatorPanel {
 
         const { deviceType, brand } = this.lastPrintInfo;
         const receiptContentEl = document.querySelector('.receipt-content');
-        console.log(`[PRINT-BUFFER] Processing buffered data for device: ${deviceType}, brand: ${brand}, chunks: ${this.printDataBuffer.length}`);
+        dlog(`[PRINT-BUFFER] Processing buffered data for device: ${deviceType}, brand: ${brand}, chunks: ${this.printDataBuffer.length}`);
 
         try {
             // Concatenate all buffered chunks into a single Uint8Array
@@ -519,17 +528,17 @@ class POSSimulatorPanel {
             this.logActivity('printer', `Processing buffered job (${brand}, ${fullPrintData.length} bytes)`);
 
             const parsedData = this.escposParser.parse(fullPrintData, brand);
-            console.log('[PRINT-BUFFER] Successfully parsed buffered data:', parsedData);
+            dlog('[PRINT-BUFFER] Successfully parsed buffered data:', parsedData);
 
             // Check for drawer kick commands
             const drawerCommands = parsedData.commands.filter(cmd => cmd.name === 'drawer_kick' || cmd.type === 'drawer_kick');
             if (drawerCommands.length > 0) {
-                console.log(`[PRINT-BUFFER] Found ${drawerCommands.length} drawer kick command(s) in buffered data!`);
+                dlog(`[PRINT-BUFFER] Found ${drawerCommands.length} drawer kick command(s) in buffered data!`);
                 this.handleDrawerKickFromPrinter(drawerCommands.length, brand);
             }
 
             const receiptHtml = this.escposParser.renderToHTML(parsedData);
-            console.log('[PRINT-BUFFER] Successfully rendered HTML from buffered data.');
+            dlog('[PRINT-BUFFER] Successfully rendered HTML from buffered data.');
             receiptContentEl.innerHTML = receiptHtml;
 
         } catch (error) {
@@ -545,7 +554,7 @@ class POSSimulatorPanel {
     }
 
     togglePrinter(printerType, isEnabled) {
-        console.log(`[USER-ACTION] Toggled ${printerType} printer ${isEnabled ? 'ON' : 'OFF'}`);
+        dlog(`[USER-ACTION] Toggled ${printerType} printer ${isEnabled ? 'ON' : 'OFF'}`);
         this.sendMessage('TOGGLE_PRINTER', { printerType, isEnabled });
     }
 
@@ -562,7 +571,7 @@ class POSSimulatorPanel {
     }
 
     changePrinterBrand(printerType, brand) {
-        console.log(`[USER-ACTION] Changed ${printerType} printer brand to ${brand}`);
+        dlog(`[USER-ACTION] Changed ${printerType} printer brand to ${brand}`);
         this.sendMessage('CHANGE_PRINTER_BRAND', { printerType, brand });
     }
 
@@ -575,7 +584,7 @@ class POSSimulatorPanel {
 
     async sendMessage(type, data) {
         if (this.port) {
-            console.log(`[PANEL] Sending message to service worker: ${type}`, data);
+            dlog(`[PANEL] Sending message to service worker: ${type}`, data);
             this.port.postMessage({ type, data });
         } else {
             console.error(`[PANEL] FAILED to send message. Port not connected. Type: ${type}`, data);
@@ -589,7 +598,7 @@ class POSSimulatorPanel {
         const wasConnected = indicator.classList.contains('connected');
 
         if (wasConnected !== connected) {
-            console.log(`[PANEL] Connection status changed. Connected: ${connected}. URL: ${url}`);
+            dlog(`[PANEL] Connection status changed. Connected: ${connected}. URL: ${url}`);
         }
 
         indicator.classList.toggle('connected', connected);
@@ -653,7 +662,7 @@ class POSSimulatorPanel {
             testBarcode = this.aamvaGenerator.generate(randomCardType);
 
             // Log what type was generated for debugging
-            console.log(`[PANEL] Generated AAMVA ${randomCardType} barcode`);
+            dlog(`[PANEL] Generated AAMVA ${randomCardType} barcode`);
             this.logActivity('scanner', `Generated AAMVA ${randomCardType} test barcode`);
         } else {
             testBarcode = this.testData.barcodes[format] || 'TEST123456';
@@ -754,7 +763,7 @@ class POSSimulatorPanel {
 
     // New method to handle drawer open from any source
     triggerDrawerOpen(source = 'manual') {
-        console.log(`[DRAWER] Opening drawer triggered by: ${source}`);
+        dlog(`[DRAWER] Opening drawer triggered by: ${source}`);
         // We don't need to send a message here as this is the final action handler
         this.updateDrawerVisual(true);
         this.logActivity('drawer', `Drawer opened via ${source}`);
@@ -979,7 +988,7 @@ class POSSimulatorPanel {
             document.body.classList.add(`theme-${themeName}`);
         }
         
-        console.log(`[THEME] Applied theme: ${themeName}`);
+        dlog(`[THEME] Applied theme: ${themeName}`);
         this.updateStatus(`Theme changed to ${this.getThemeDisplayName(themeName)}`);
     }
 
@@ -1054,13 +1063,13 @@ class POSSimulatorPanel {
             document.getElementById('theme-preset-select').value = theme;
             this.applyTheme(theme);
             this.updateThemePreview(theme);
-            console.log(`[THEME] Loaded saved theme: ${theme}`);
+            dlog(`[THEME] Loaded saved theme: ${theme}`);
         });
     }
 
     saveTheme(themeName) {
         chrome.storage.local.set({ posSimulatorTheme: themeName }, () => {
-            console.log(`[THEME] Saved theme: ${themeName}`);
+            dlog(`[THEME] Saved theme: ${themeName}`);
         });
     }
 

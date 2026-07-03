@@ -251,13 +251,16 @@ The extension can be extended with additional peripherals by:
 3. Adding message handlers in `service-worker.js`
 4. Creating content script integration as needed
 
+## Privacy
+
+This extension collects no personal data, has no analytics or tracking, and
+stores all settings locally on your device. It only runs on tbay.tk POS and
+`localhost` pages. See **[PRIVACY.md](PRIVACY.md)** for the full privacy policy
+and the Chrome Web Store data-use disclosures.
+
 ## License
 
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
+Developed and distributed by tbay.tk LLC — Alexander Milton — https://tbay.tk
 
 ## Support
 

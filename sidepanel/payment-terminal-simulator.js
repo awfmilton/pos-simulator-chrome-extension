@@ -1,8 +1,7 @@
 /*
  * payment-terminal-simulator.js
  * ─────────────────────────────
- * Owned and Distributed by: tbay.tk LLC, MT, 59601
- * Developed by: Alexander Milton
+ * tbay.tk Virtual Peripheral Simulator — Developed by: Alexander Milton (https://tbay.tk)
  *
  * Module: Payment Terminal Simulator
  * Manages the Terminal tab in the POS Peripheral Simulator side panel.
@@ -112,7 +111,7 @@
                 if (elMonerisClientSecret && result.monerisClientSecret) elMonerisClientSecret.value = result.monerisClientSecret;
                 if (elMonerisMerchantId   && result.monerisMerchantId)   elMonerisMerchantId.value   = result.monerisMerchantId;
 
-                console.log('[TerminalSim] Initialized. Virtual IP:', state.virtualIp, '| Environment:', state.environment);
+                if (state.debug) console.log('[TerminalSim] Initialized. Virtual IP:', state.virtualIp, '| Environment:', state.environment);
             }
         );
     };
@@ -125,7 +124,7 @@
 
         // Deduplicate: ignore retries for a requestId already in the queue
         if (state.pendingRequests.some(r => r.id === reqId)) {
-            console.log('[TerminalSim] Duplicate requestId ignored:', reqId);
+            if (state.debug) console.log('[TerminalSim] Duplicate requestId ignored:', reqId);
             return;
         }
 
@@ -344,7 +343,7 @@
             elBrandSelect.addEventListener('change', () => {
                 state.activeBrand = elBrandSelect.value;
                 _updateBrandVisibility();
-                console.log('[TerminalSim] Brand changed to:', state.activeBrand);
+                if (state.debug) console.log('[TerminalSim] Brand changed to:', state.activeBrand);
             });
         }
         if (elPartialAuthInput) {
@@ -606,7 +605,7 @@
 
             if (state.swPort) {
                 state.swPort.postMessage(payload);
-                console.log('[TerminalSim] Stripe sandbox response sent:', payload);
+                if (state.debug) console.log('[TerminalSim] Stripe sandbox response sent:', payload);
             }
 
             _markLogEntryResolved(req.id, realOutcome, method);
@@ -664,7 +663,9 @@
             };
 
             if (state.debug) {
-                console.log('[TerminalSim][Moneris] Cloud API request', { orderId, amountCents, cardNumber });
+                // Never log the card number, even in debug. Show only a masked last-4.
+                const cardLast4 = (cardNumber && cardNumber.slice(-4)) || '????';
+                console.log('[TerminalSim][Moneris] Cloud API request', { orderId, amountCents, cardLast4 });
             }
 
             const merchantId = (elMonerisMerchantId?.value.trim()) || '0030200110408';
@@ -896,7 +897,7 @@
 
         if (state.swPort) {
             state.swPort.postMessage(payload);
-            console.log('[TerminalSim] Sent response:', payload);
+            if (state.debug) console.log('[TerminalSim] Sent response:', payload);
         } else {
             console.error('[TerminalSim] SW port not available — cannot send response.');
         }

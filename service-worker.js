@@ -1,10 +1,26 @@
 /*
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
-*/
+ * tbay.tk Virtual Peripheral Simulator — background service worker
+ * Developed by: Alexander Milton — https://tbay.tk
+ */
+
+// ── Verbose-logging gate ─────────────────────────────────────────────────────
+// High-volume traces are gated behind the operator's debug toggle
+// (posSimulatorSettings.debugMode). console.warn/error are never gated.
+// dlog() is a no-op unless DEBUG is on.
+let DEBUG = false;
+try {
+    chrome.storage.local.get('posSimulatorSettings', (result) => {
+        DEBUG = !!(result && result.posSimulatorSettings && result.posSimulatorSettings.debugMode);
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.posSimulatorSettings) {
+            const v = changes.posSimulatorSettings.newValue;
+            DEBUG = !!(v && v.debugMode);
+        }
+    });
+} catch (e) { /* storage unavailable — stay quiet */ }
+function dlog(...args) { if (DEBUG) console.log(...args); }
+
 class PeripheralSimulatorService {
     constructor() {
         this.printerStates = {
@@ -29,7 +45,7 @@ class PeripheralSimulatorService {
     }
 
     init() {
-        console.log('[SW] Initializing Service Worker...');
+        dlog('[SW] Initializing Service Worker...');
         // Listen for any new connections
         chrome.runtime.onConnect.addListener(port => {
             if (port.name === 'sidepanel') {
@@ -71,11 +87,11 @@ class PeripheralSimulatorService {
     }
 
     handleSidePanelConnection(port) {
-        console.log('[SW] Side panel connected.');
+        dlog('[SW] Side panel connected.');
         this.sidePanelPort = port;
         port.onMessage.addListener(msg => this.handlePanelMessage(msg));
         port.onDisconnect.addListener(() => {
-            console.log('[SW] Side panel disconnected.');
+            dlog('[SW] Side panel disconnected.');
             this.sidePanelPort = null;
         });
         this.updatePanelWithInitialState();
@@ -88,7 +104,7 @@ class PeripheralSimulatorService {
 
         // Deliver any charge request that arrived before the panel was open.
         if (this.pendingChargeRequest) {
-            console.log('[SW] Delivering buffered TERMINAL_CHARGE_REQUEST to newly-connected panel.');
+            dlog('[SW] Delivering buffered TERMINAL_CHARGE_REQUEST to newly-connected panel.');
             port.postMessage(this.pendingChargeRequest);
             this.pendingChargeRequest = null;
         }
@@ -110,7 +126,7 @@ class PeripheralSimulatorService {
             try { port.disconnect(); } catch (e) { /* noop */ }
             return;
         }
-        console.log(`[SW] Content script from tab ${tabId} connected.`);
+        dlog(`[SW] Content script from tab ${tabId} connected.`);
         this.contentScriptPorts.set(tabId, port);
 
         port.onMessage.addListener(async (msg) => {
@@ -118,7 +134,7 @@ class PeripheralSimulatorService {
             if (msg.type === 'POS_PAGE_DETECTED') {
                 if (msg.isPos) {
                     this.posTabs.set(tabId, { url: msg.url });
-                    console.log(`[SW] Tab ${tabId} confirmed as POS page: ${msg.url}`);
+                    dlog(`[SW] Tab ${tabId} confirmed as POS page: ${msg.url}`);
                 } else {
                     this.posTabs.delete(tabId);
                 }
@@ -127,7 +143,7 @@ class PeripheralSimulatorService {
             }
             // Route print/hardware data through handleRawData()
             if (msg.type === 'POS_SIMULATOR_RAW_DATA' || msg.type === 'RAW_DATA_FROM_PAGE') {
-                console.log(`[SW] Received hardware data from content script (type: ${msg.type}, deviceType: ${msg.deviceType}, source: ${msg.source}). Routing through handleRawData().`);
+                dlog(`[SW] Received hardware data from content script (type: ${msg.type}, deviceType: ${msg.deviceType}, source: ${msg.source}). Routing through handleRawData().`);
                 this.handleRawData(msg);
             } else if (msg.type === 'POS_SIMULATOR_DISPLAY_UPDATE') {
                 if (this.sidePanelPort) {
@@ -137,7 +153,7 @@ class PeripheralSimulatorService {
                 }
             } else if (msg.type === 'TERMINAL_CHARGE_REQUEST') {
                 // Forward charge request from POS page → panel terminal simulator
-                console.log('[SW] TERMINAL_CHARGE_REQUEST received from content script:', msg);
+                dlog('[SW] TERMINAL_CHARGE_REQUEST received from content script:', msg);
                 const chargePayload = {
                     type:      'TERMINAL_CHARGE_REQUEST',
                     requestId: msg.requestId,
@@ -170,7 +186,7 @@ class PeripheralSimulatorService {
                     console.warn('[SW] No side panel connected — cannot deliver SQUARE_POS_MOCK_REQUEST.');
                 }
             } else if (msg.type === 'TERMINAL_CHARGE_CANCEL') {
-                console.log('[SW] TERMINAL_CHARGE_CANCEL received from content script.');
+                dlog('[SW] TERMINAL_CHARGE_CANCEL received from content script.');
                 this.pendingChargeRequest = null; // discard any buffered request
                 if (this.sidePanelPort) {
                     this.sidePanelPort.postMessage({ type: 'TERMINAL_CHARGE_CANCEL' });
@@ -183,7 +199,7 @@ class PeripheralSimulatorService {
                     this.posTabs.set(tabId, { url: (port.sender && port.sender.url) || null });
                     this.checkConnection();
                 }
-                console.log('[SW] TERMINAL_READY_SIGNAL received from content script:', msg);
+                dlog('[SW] TERMINAL_READY_SIGNAL received from content script:', msg);
                 if (this.sidePanelPort) {
                     this.sidePanelPort.postMessage({
                         type:       'TERMINAL_READY_SIGNAL',
@@ -201,7 +217,7 @@ class PeripheralSimulatorService {
         });
 
         port.onDisconnect.addListener(() => {
-            console.log(`[SW] Content script from tab ${tabId} disconnected.`);
+            dlog(`[SW] Content script from tab ${tabId} disconnected.`);
             this.contentScriptPorts.delete(tabId);
             this.posTabs.delete(tabId);
             this.checkConnection(); // recompute the light when a POS tab goes away
@@ -210,10 +226,10 @@ class PeripheralSimulatorService {
 
 
     handlePanelMessage(msg) {
-        console.log('[SW] Received message from side panel:', msg);
+        dlog('[SW] Received message from side panel:', msg);
         switch (msg.type) {
             case 'KEEP_ALIVE':
-                console.log('[SW] Keep-alive signal received.');
+                dlog('[SW] Keep-alive signal received.');
                 break;
             case 'TOGGLE_PRINTER':
                 if (msg.data && msg.data.printerType) {
@@ -224,7 +240,7 @@ class PeripheralSimulatorService {
             case 'CHANGE_PRINTER_BRAND':
                 if (msg.data && msg.data.printerType) {
                     this.printerStates[msg.data.printerType].brand = msg.data.brand;
-                    console.log(`[SW] Printer brand for ${msg.data.printerType} set to ${msg.data.brand}`);
+                    dlog(`[SW] Printer brand for ${msg.data.printerType} set to ${msg.data.brand}`);
                 }
                 break;
             case 'CHECK_CONNECTION':
@@ -294,17 +310,17 @@ class PeripheralSimulatorService {
             case 'TERMINAL_SIMULATE_RESPONSE':
                 // Operator clicked Approve / Decline / Timeout in the terminal panel.
                 // Broadcast to all POS content-script ports so TerminalBridge.js resolves.
-                console.log('[SW] Broadcasting TERMINAL_SIMULATE_RESPONSE to all content scripts:', msg);
+                dlog('[SW] Broadcasting TERMINAL_SIMULATE_RESPONSE to all content scripts:', msg);
                 this.broadcastToContentScripts(msg);
                 break;
             case 'SQUARE_POS_MOCK_RESPONSE':
                 // Square POS API mock: panel operator approved/declined — relay to all content scripts.
-                console.log('[SW] Broadcasting SQUARE_POS_MOCK_RESPONSE to all content scripts:', msg);
+                dlog('[SW] Broadcasting SQUARE_POS_MOCK_RESPONSE to all content scripts:', msg);
                 this.broadcastToContentScripts(msg);
                 break;
             case 'TERMINAL_CHARGE_CANCEL':
                 // POS operator cancelled the pending terminal request from the panel side.
-                console.log('[SW] Broadcasting TERMINAL_CHARGE_CANCEL to all content scripts.');
+                dlog('[SW] Broadcasting TERMINAL_CHARGE_CANCEL to all content scripts.');
                 this.broadcastToContentScripts({ type: 'TERMINAL_CHARGE_CANCEL' });
                 break;
         }
@@ -352,7 +368,7 @@ class PeripheralSimulatorService {
 
 
     handleRawData(request) {
-        console.log(`[SW] Received ${request.connectionType || request.source} printer data:`, request);
+        dlog(`[SW] Received ${request.connectionType || request.source} printer data:`, request);
 
         if (request.deviceType === 'printer') {
             // Map connection types to printer states
@@ -380,7 +396,7 @@ class PeripheralSimulatorService {
                     });
                 }
             } else {
-                console.log(`[SW] ${printerType} printer is disabled, ignoring data`);
+                dlog(`[SW] ${printerType} printer is disabled, ignoring data`);
             }
             return; // Done handling printer data
         }
@@ -388,7 +404,7 @@ class PeripheralSimulatorService {
         // Handle other device types...
         if (request.deviceType === 'cash-drawer') {
             if (this.sidePanelPort) {
-                console.log('[SW] Forwarding drawer command to side panel.');
+                dlog('[SW] Forwarding drawer command to side panel.');
                 this.sidePanelPort.postMessage({
                     type: 'DRAWER_COMMAND_RECEIVED',
                     source: request.source,
@@ -508,7 +524,7 @@ class PeripheralSimulatorService {
     // ===== NEW FEATURES MESSAGE HANDLERS =====
 
     handleKeyboardInput(data) {
-        console.log('[SW] Handling keyboard input:', data);
+        dlog('[SW] Handling keyboard input:', data);
         this.injectInputToActivePage({
             type: 'keyboard',
             keyData: data
@@ -516,7 +532,7 @@ class PeripheralSimulatorService {
     }
 
     handleMSRSwipe(data) {
-        console.log('[SW] Handling MSR swipe:', data);
+        dlog('[SW] Handling MSR swipe:', data);
         this.injectInputToActivePage({
             type: 'msr',
             track1: data.track1,
@@ -526,7 +542,7 @@ class PeripheralSimulatorService {
     }
 
     handleNFCTap(data) {
-        console.log('[SW] Handling NFC tap:', data);
+        dlog('[SW] Handling NFC tap:', data);
         this.injectInputToActivePage({
             type: 'nfc',
             cardData: data,
@@ -541,7 +557,7 @@ class PeripheralSimulatorService {
     }
 
     handleChipInsert(data) {
-        console.log('[SW] Handling chip card insert:', data);
+        dlog('[SW] Handling chip card insert:', data);
         this.injectInputToActivePage({
             type: 'chip_insert',
             cardData: data,
@@ -556,7 +572,7 @@ class PeripheralSimulatorService {
     }
 
     handleChipRemove(data) {
-        console.log('[SW] Handling chip card remove:', data);
+        dlog('[SW] Handling chip card remove:', data);
         this.injectInputToActivePage({
             type: 'chip_remove',
             timestamp: data.timestamp
@@ -570,7 +586,7 @@ class PeripheralSimulatorService {
     }
 
     async handleSendEmail(data) {
-        console.log('[SW] Handling email send request:', data);
+        dlog('[SW] Handling email send request:', data);
 
         // NOTE: this is a mock — no email is actually sent. It RETURNS the
         // response object so the onMessage wrapper can sendResponse() with the
@@ -583,7 +599,7 @@ class PeripheralSimulatorService {
                 messageId: 'msg_' + Date.now(),
                 timestamp: new Date().toISOString()
             };
-            console.log('[SW] Email simulation completed:', response);
+            dlog('[SW] Email simulation completed:', response);
             return response;
         } catch (error) {
             console.error('[SW] Email simulation failed:', error);

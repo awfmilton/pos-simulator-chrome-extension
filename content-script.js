@@ -1,11 +1,17 @@
 /*
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
-*/
+ * tbay.tk Virtual Peripheral Simulator
+ * Developed by: Alexander Milton — https://tbay.tk
+ */
 // content-script.js
+
+// ── Verbose-logging gate ─────────────────────────────────────────────────────
+// Traces are gated behind the operator's debug toggle (terminal_debug_enabled
+// in the POS page's localStorage). console.warn/error are never gated.
+function _csDebug() {
+    try { return localStorage.getItem('terminal_debug_enabled') === '1'; }
+    catch (e) { return false; }
+}
+function dlog(...args) { if (_csDebug()) console.log(...args); }
 
 // 1. Inject the interceptor script into the main world
 function injectScript(filePath) {
@@ -16,7 +22,7 @@ function injectScript(filePath) {
     script.onload = () => {
         script.remove(); // Clean up the DOM after execution
     };
-    console.log('[CS] Injected script:', filePath);
+    dlog('[CS] Injected script:', filePath);
 }
 
 class POSContentScript {
@@ -48,7 +54,7 @@ class POSContentScript {
             setTimeout(() => this.connectToServiceWorker(), 5000);
             return;
         }
-        console.log('[CS] Attempting to connect to service worker...');
+        dlog('[CS] Attempting to connect to service worker...');
 
         // Immediately broadcast current POS terminal state so the side panel
         // can update the status light if it was already open before this page loaded.
@@ -79,7 +85,7 @@ class POSContentScript {
             // Sent by service-worker when the panel operator clicks Approve/Decline/Timeout.
             // Re-broadcast to the POS page so TerminalBridge.js can resolve/reject.
             if (request.type === 'TERMINAL_SIMULATE_RESPONSE') {
-                console.log('[CS] Relaying TERMINAL_SIMULATE_RESPONSE to page:', request);
+                dlog('[CS] Relaying TERMINAL_SIMULATE_RESPONSE to page:', request);
                 window.postMessage({
                     type:      'POS_TERMINAL_CHARGE_RESPONSE',
                     outcome:   request.outcome,
@@ -202,7 +208,7 @@ class POSContentScript {
             // TerminalBridge.js posts POS_TERMINAL_CHARGE_REQUEST to window.
             // We forward it to the service worker, which relays it to the panel.
             if (t === 'POS_TERMINAL_CHARGE_REQUEST') {
-                console.log('[CS] Forwarding POS_TERMINAL_CHARGE_REQUEST to SW:', event.data);
+                dlog('[CS] Forwarding POS_TERMINAL_CHARGE_REQUEST to SW:', event.data);
                 if (this.port) {
                     this.port.postMessage({
                         type:      'TERMINAL_CHARGE_REQUEST',
@@ -238,7 +244,7 @@ class POSContentScript {
 
             // ── Terminal Bridge: cancel signal ───────────────────────────────
             if (t === 'POS_TERMINAL_CHARGE_CANCEL') {
-                console.log('[CS] Forwarding POS_TERMINAL_CHARGE_CANCEL to SW.');
+                dlog('[CS] Forwarding POS_TERMINAL_CHARGE_CANCEL to SW.');
                 if (this.port) {
                     this.port.postMessage({ type: 'TERMINAL_CHARGE_CANCEL', timestamp: event.data.timestamp });
                 }
@@ -249,7 +255,7 @@ class POSContentScript {
             // BaseTerminalBridge on initial load.  Forwarded to the extension
             // side panel so it can update the connection status light.
             if (t === 'POS_TERMINAL_READY') {
-                console.log('[CS] Forwarding POS_TERMINAL_READY to SW:', event.data);
+                dlog('[CS] Forwarding POS_TERMINAL_READY to SW:', event.data);
                 if (this.port) {
                     this.port.postMessage({
                         type:       'TERMINAL_READY_SIGNAL',
@@ -274,7 +280,7 @@ class POSContentScript {
     }
 
     injectInput(data) {
-        console.log('[CS] Injecting input:', data);
+        dlog('[CS] Injecting input:', data);
         
         switch (data.type) {
             case 'barcode':
@@ -415,7 +421,7 @@ class POSContentScript {
         const amountElement = document.querySelector('input[name*="amount"], input[id*="amount"], input[type="number"]');
         if (amountElement && !amountElement.value) {
             // Don't override existing amounts, just trigger the NFC event
-            console.log('[CS] NFC tap simulated for payment terminal detection');
+            dlog('[CS] NFC tap simulated for payment terminal detection');
         }
     }
 
@@ -430,7 +436,7 @@ class POSContentScript {
             }
         }));
 
-        console.log(`[CS] ${eventType} event dispatched`);
+        dlog(`[CS] ${eventType} event dispatched`);
     }
 
     injectLegacyInput(data) {
@@ -545,7 +551,7 @@ class POSContentScript {
     // ===== NEW PAYMENT HANDLERS =====
     
     handleNFCPayment(data) {
-        console.log('[CS] Handling NFC payment broadcast:', data);
+        dlog('[CS] Handling NFC payment broadcast:', data);
         
         // Broadcast NFC event to page context for payment terminal emulation
         window.postMessage({
@@ -561,7 +567,7 @@ class POSContentScript {
     }
 
     handleChipInsert(data) {
-        console.log('[CS] Handling chip insert broadcast:', data);
+        dlog('[CS] Handling chip insert broadcast:', data);
         
         // Broadcast chip insert event to page context
         window.postMessage({
@@ -577,7 +583,7 @@ class POSContentScript {
     }
 
     handleChipRemove(data) {
-        console.log('[CS] Handling chip remove broadcast:', data);
+        dlog('[CS] Handling chip remove broadcast:', data);
         
         // Broadcast chip remove event to page context
         window.postMessage({
