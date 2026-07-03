@@ -552,6 +552,12 @@
         // Determine the POS origin from state (set during init or from message)
         const posOrigin = state.posOrigin || 'http://localhost:8000';
 
+        // Remove THIS request from the queue exactly once, up front. Previously
+        // both .then() and .catch() called shift(); if any statement in .then()
+        // after the shift threw, .catch() shifted a SECOND time and silently
+        // dropped an unrelated pending request (its POS Promise then timed out).
+        state.pendingRequests.shift();
+
         fetch(`${posOrigin}/api/stripe_simulate.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -563,7 +569,6 @@
         })
         .then(r => r.json())
         .then(simResult => {
-            state.pendingRequests.shift();
             const brand = state.activeBrand;
 
             // Build real vendor payload from the PHP stripe_simulate result
@@ -592,7 +597,7 @@
                     ?? REASON_MESSAGES[method]
                     ?? 'Card declined.';
             }
-            if (realOutcome === 'partial_auth') {
+            if (realOutcome === 'partial_auth' && window.TerminalSimulatorHelpers) {
                 const partialAmt = (window.TerminalSimulatorHelpers.partialCents(req, state.partialAuthPercent) / 100).toFixed(2);
                 payload.reason          = REASON_MESSAGES.partial_auth;
                 payload.partialAmount   = partialAmt;
@@ -610,8 +615,9 @@
         })
         .catch(err => {
             console.error('[TerminalSim] stripe_simulate.php call failed:', err);
-            // Fall back to mock response so the operator isn't stuck
-            state.pendingRequests.shift();
+            // The request was already removed from the queue above — do NOT shift
+            // again here (that would drop an unrelated pending request). Fall back
+            // to a mock response so the operator isn't stuck.
             _dispatchResponseDirect(outcome, method, req);
         });
     }
@@ -626,6 +632,10 @@
      * OAuth token is cached in state for up to 24 h (with a 5-min buffer).
      */
     async function _callMonerisSimulate(req, outcome, method) {
+        // Remove THIS request from the queue exactly once, before any await, so a
+        // throw in the try block cannot make the catch shift a second time and
+        // drop an unrelated pending request.
+        state.pendingRequests.shift();
         try {
             const token = await _getMonerisToken();
 
@@ -712,8 +722,6 @@
                 txn_num:           parsed.paymentId ?? null,
             };
 
-            state.pendingRequests.shift();
-
             const payload = {
                 type:          'TERMINAL_SIMULATE_RESPONSE',
                 requestId:     req.id,
@@ -747,7 +755,7 @@
 
         } catch (err) {
             console.error('[TerminalSim] Moneris Cloud API call failed, falling back to mock:', err);
-            state.pendingRequests.shift();
+            // Request already removed from the queue above — do not shift again.
             _dispatchResponseDirect(outcome, method, req);
         }
     }

@@ -20,6 +20,10 @@ class PeripheralSimulatorService {
         // Holds a TERMINAL_CHARGE_REQUEST that arrived before the side panel opened.
         // Delivered immediately when the panel connects; cleared on deliver or cancel.
         this.pendingChargeRequest = null;
+        // Tabs the content script has confirmed are a tbay POS page (tabId → {url}).
+        // Drives autodetect: the connection light goes green whenever any of these
+        // has a live content-script port, without the operator typing a target URL.
+        this.posTabs = new Map();
 
         this.init();
     }
@@ -41,6 +45,10 @@ class PeripheralSimulatorService {
         // those messages are silently dropped (virtual keyboard dead, email
         // receipts dead).
         chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+            // Only accept one-shot messages from this extension's own pages
+            // (the side panel). A web page cannot set sender.id to our id, so
+            // this rejects any content-script/page-originated runtime message.
+            if (!sender || sender.id !== chrome.runtime.id) return false;
             if (!msg || !msg.type) return false;
             if (msg.type === 'KEYBOARD_INPUT') {
                 this.handleKeyboardInput(msg.data);
@@ -84,14 +92,39 @@ class PeripheralSimulatorService {
             port.postMessage(this.pendingChargeRequest);
             this.pendingChargeRequest = null;
         }
+
+        // Compute the connection light immediately on panel open (don't wait for
+        // the 5s poll) so an already-open POS tab shows green right away. Force a
+        // fresh push by clearing the change-detection cache first.
+        this.isConnected = false;
+        this.checkConnection();
     }
 
     handleContentScriptConnection(port) {
-        const tabId = port.sender.tab.id;
+        // Defensive: only real tab-hosted content scripts should connect with
+        // this name. Reject senders without a tab (devtools/other extension
+        // pages) rather than throwing on port.sender.tab.id.
+        const tabId = port.sender && port.sender.tab && port.sender.tab.id;
+        if (tabId == null) {
+            console.warn('[SW] Rejecting content-script port with no tab sender.');
+            try { port.disconnect(); } catch (e) { /* noop */ }
+            return;
+        }
         console.log(`[SW] Content script from tab ${tabId} connected.`);
         this.contentScriptPorts.set(tabId, port);
 
         port.onMessage.addListener(async (msg) => {
+            // ── Autodetect: content script reports whether this tab is a POS page ─
+            if (msg.type === 'POS_PAGE_DETECTED') {
+                if (msg.isPos) {
+                    this.posTabs.set(tabId, { url: msg.url });
+                    console.log(`[SW] Tab ${tabId} confirmed as POS page: ${msg.url}`);
+                } else {
+                    this.posTabs.delete(tabId);
+                }
+                this.checkConnection(); // re-evaluate the light immediately
+                return;
+            }
             // Route print/hardware data through handleRawData()
             if (msg.type === 'POS_SIMULATOR_RAW_DATA' || msg.type === 'RAW_DATA_FROM_PAGE') {
                 console.log(`[SW] Received hardware data from content script (type: ${msg.type}, deviceType: ${msg.deviceType}, source: ${msg.source}). Routing through handleRawData().`);
@@ -144,7 +177,12 @@ class PeripheralSimulatorService {
                 }
             } else if (msg.type === 'TERMINAL_READY_SIGNAL') {
                 // POS settings changed (terminal enabled/disabled, brand, IP).
-                // Relay to the side panel so it can update the connection light.
+                // This message only originates from a real POS page, so it also
+                // confirms the tab as a POS page for the autodetect light.
+                if (!this.posTabs.has(tabId)) {
+                    this.posTabs.set(tabId, { url: (port.sender && port.sender.url) || null });
+                    this.checkConnection();
+                }
                 console.log('[SW] TERMINAL_READY_SIGNAL received from content script:', msg);
                 if (this.sidePanelPort) {
                     this.sidePanelPort.postMessage({
@@ -165,6 +203,8 @@ class PeripheralSimulatorService {
         port.onDisconnect.addListener(() => {
             console.log(`[SW] Content script from tab ${tabId} disconnected.`);
             this.contentScriptPorts.delete(tabId);
+            this.posTabs.delete(tabId);
+            this.checkConnection(); // recompute the light when a POS tab goes away
         });
     }
 
@@ -205,6 +245,17 @@ class PeripheralSimulatorService {
                 if (msg.data) {
                     this.broadcastToContentScripts({
                         action: 'UPDATE_SCALE_ON_PAGE',
+                        data: msg.data
+                    });
+                }
+                break;
+            case 'UPDATE_DISPLAY':
+                // Customer line-display update from the panel → POS page.
+                // Mirrors UPDATE_SCALE; without this case the panel's
+                // "Update/Clear Display" buttons were silently dropped.
+                if (msg.data) {
+                    this.broadcastToContentScripts({
+                        action: 'UPDATE_DISPLAY_ON_PAGE',
                         data: msg.data
                     });
                 }
@@ -263,7 +314,8 @@ class PeripheralSimulatorService {
         this.injectInputToActivePage({
             type: 'barcode',
             value: data.barcode,
-            simulateEnter: data.simulateEnter || true
+            // `x || true` was always true — honor the panel's checkbox instead.
+            simulateEnter: data.simulateEnter === true
         });
     }
 
@@ -388,32 +440,55 @@ class PeripheralSimulatorService {
         }
     }
 
+    /**
+     * Autodetect the POS connection and drive the indicator.
+     *
+     * Source of truth: a POS page is CONNECTED when a tab the content script has
+     * confirmed as a tbay POS (this.posTabs) still has a live content-script
+     * port (this.contentScriptPorts). No operator-typed URL is required — the
+     * light goes green automatically the moment a POS tab is open with the panel.
+     *
+     * If the operator HAS typed a target URL pattern, it is applied only as an
+     * optional additional filter (so power users can pin the simulator to one
+     * specific POS URL); it is never a prerequisite for detection.
+     */
     async checkConnection() {
-        if (!this.posUrlPattern) {
-            this.updateConnectionStatus(false, null);
-            return;
-        }
-
         try {
-            // Find all tabs to see if any matches the POS URL and is connected
-            const tabs = await chrome.tabs.query({});
-            let connectedTab = null;
+            // Primary path: a confirmed POS tab with a live port.
+            for (const [tabId, info] of this.posTabs) {
+                if (!this.contentScriptPorts.has(tabId)) continue;
+                if (this.posUrlPattern && info.url && !this._urlMatchesPattern(info.url, this.posUrlPattern)) continue;
+                this.updateConnectionStatus(true, info.url || null);
+                return;
+            }
 
-            for (const tab of tabs) {
-                // Check if the tab URL matches AND if we have an active connection from its content script
-                if (tab.url && tab.url.match(new RegExp(this.posUrlPattern.replace('*', '.*'))) && this.contentScriptPorts.has(tab.id)) {
-                    connectedTab = tab;
-                    break;
+            // Fallback (only when a pattern is configured): match open tabs by URL
+            // in case a POS page loaded before detection wiring existed.
+            if (this.posUrlPattern) {
+                const tabs = await chrome.tabs.query({});
+                for (const tab of tabs) {
+                    if (tab.url && this.contentScriptPorts.has(tab.id) && this._urlMatchesPattern(tab.url, this.posUrlPattern)) {
+                        this.updateConnectionStatus(true, tab.url);
+                        return;
+                    }
                 }
             }
 
-            if (connectedTab) {
-                this.updateConnectionStatus(true, connectedTab.url);
-            } else {
-                this.updateConnectionStatus(false, null);
-            }
+            this.updateConnectionStatus(false, null);
         } catch (error) {
             this.updateConnectionStatus(false, null);
+        }
+    }
+
+    /** Glob-match a URL against a '*'-wildcard pattern, escaping regex metachars. */
+    _urlMatchesPattern(url, pattern) {
+        try {
+            const rx = new RegExp('^' + pattern.split('*')
+                .map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                .join('.*'));
+            return rx.test(url);
+        } catch (e) {
+            return false;
         }
     }
 
@@ -496,40 +571,23 @@ class PeripheralSimulatorService {
 
     async handleSendEmail(data) {
         console.log('[SW] Handling email send request:', data);
-        
+
+        // NOTE: this is a mock — no email is actually sent. It RETURNS the
+        // response object so the onMessage wrapper can sendResponse() with the
+        // true success/failure. (Previously it returned undefined and posted a
+        // separate EMAIL_RESPONSE port message, so callers always saw success
+        // and got a duplicate, unhandled response.)
         try {
-            // In a real implementation, this would integrate with an email service
-            // For now, we'll simulate the email functionality
-            
-            // Create a mock response
             const response = {
                 success: true,
                 messageId: 'msg_' + Date.now(),
                 timestamp: new Date().toISOString()
             };
-            
-            // Send response back to panel
-            if (this.sidePanelPort) {
-                this.sidePanelPort.postMessage({
-                    type: 'EMAIL_RESPONSE',
-                    data: response
-                });
-            }
-            
             console.log('[SW] Email simulation completed:', response);
-            
+            return response;
         } catch (error) {
             console.error('[SW] Email simulation failed:', error);
-            
-            if (this.sidePanelPort) {
-                this.sidePanelPort.postMessage({
-                    type: 'EMAIL_RESPONSE',
-                    data: {
-                        success: false,
-                        error: error.message
-                    }
-                });
-            }
+            return { success: false, error: error.message };
         }
     }
 }

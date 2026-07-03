@@ -27,12 +27,11 @@ class ReceiptManager {
     // Generate PDF receipt using jsPDF
     async generatePDF(receiptData, options = {}) {
         try {
-            // Import jsPDF dynamically
-            if (!window.jsPDF) {
-                await this.loadJsPDF();
-            }
-
-            const { jsPDF } = window;
+            // jsPDF is bundled locally and loaded by panel.html (vendor/jspdf.umd.min.js).
+            // The UMD build exposes window.jspdf.jsPDF (fallback window.jsPDF).
+            await this.loadJsPDF();
+            const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+            if (!jsPDF) throw new Error('jsPDF is not available (vendor bundle failed to load)');
             const doc = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
@@ -440,20 +439,13 @@ This email was sent from the POS Peripheral Simulator.
         }
     }
 
-    // Load jsPDF library dynamically
+    // jsPDF is bundled in the extension package and loaded by a <script> tag in
+    // panel.html — MV3 forbids loading remote code, so there is no CDN fallback.
+    // This just resolves once the global is present (it is, synchronously, after
+    // panel.html's script tag runs).
     async loadJsPDF() {
-        return new Promise((resolve, reject) => {
-            if (window.jsPDF) {
-                resolve();
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error('Failed to load jsPDF'));
-            document.head.appendChild(script);
-        });
+        if ((window.jspdf && window.jspdf.jsPDF) || window.jsPDF) return;
+        throw new Error('jsPDF vendor bundle not loaded — check panel.html includes vendor/jspdf.umd.min.js');
     }
 
     // Get receipt history
@@ -491,47 +483,42 @@ This email was sent from the POS Peripheral Simulator.
         }
     }
 
+    // EscPosParser.parse() returns { lines: [{ text, style } | { type:'command', ... }], commands }.
+    // These helpers read the printable text lines (not the non-existent .text array).
+    _textLines(parsedData) {
+        const lines = (parsedData && Array.isArray(parsedData.lines)) ? parsedData.lines : [];
+        return lines
+            .filter(l => l && typeof l.text === 'string')
+            .map(l => l.text);
+    }
+
     extractStoreName(parsedData) {
-        // Look for store name in parsed data
-        if (parsedData.text && parsedData.text.length > 0) {
-            return parsedData.text[0]; // Usually the first line
-        }
-        return 'Store Name';
+        const lines = this._textLines(parsedData).filter(t => t.trim().length > 0);
+        return lines.length > 0 ? lines[0] : 'Store Name';
     }
 
     extractItems(parsedData) {
-        // Extract items from parsed receipt data
-        // This is a simplified version - would need more sophisticated parsing
         const items = [];
-        
-        if (parsedData.text) {
-            for (const line of parsedData.text) {
-                // Look for lines that might be items (contain price patterns)
-                if (line.match(/\$[\d.]+/)) {
-                    const priceMatch = line.match(/\$([\d.]+)/);
-                    if (priceMatch) {
-                        items.push({
-                            name: line.replace(/\$[\d.]+/, '').trim(),
-                            price: parseFloat(priceMatch[1]),
-                            quantity: 1
-                        });
-                    }
-                }
+        for (const line of this._textLines(parsedData)) {
+            // Look for lines that might be items (contain price patterns)
+            const priceMatch = line.match(/\$([\d.]+)/);
+            if (priceMatch) {
+                items.push({
+                    name: line.replace(/\$[\d.]+/, '').trim(),
+                    price: parseFloat(priceMatch[1]),
+                    quantity: 1
+                });
             }
         }
-        
         return items;
     }
 
     extractTotal(parsedData) {
-        // Look for total amount in parsed data
-        if (parsedData.text) {
-            for (const line of parsedData.text) {
-                if (line.toLowerCase().includes('total')) {
-                    const priceMatch = line.match(/\$([\d.]+)/);
-                    if (priceMatch) {
-                        return parseFloat(priceMatch[1]);
-                    }
+        for (const line of this._textLines(parsedData)) {
+            if (line.toLowerCase().includes('total')) {
+                const priceMatch = line.match(/\$([\d.]+)/);
+                if (priceMatch) {
+                    return parseFloat(priceMatch[1]);
                 }
             }
         }

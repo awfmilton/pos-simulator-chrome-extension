@@ -33,12 +33,28 @@ class POSContentScript {
     }
 
     connectToServiceWorker() {
-        this.port = chrome.runtime.connect({ name: 'content-script' });
+        // If the extension was reloaded/updated, chrome.runtime is invalidated
+        // and connect() throws synchronously. Guard it so the reconnect loop
+        // survives, and stop retrying only when the context is truly dead.
+        if (!chrome.runtime || !chrome.runtime.id) {
+            console.warn('[CS] Extension context invalidated — stopping reconnect until page reload.');
+            return;
+        }
+        try {
+            this.port = chrome.runtime.connect({ name: 'content-script' });
+        } catch (e) {
+            console.warn('[CS] connect() failed, retrying in 5s:', e && e.message);
+            this.port = null;
+            setTimeout(() => this.connectToServiceWorker(), 5000);
+            return;
+        }
         console.log('[CS] Attempting to connect to service worker...');
 
         // Immediately broadcast current POS terminal state so the side panel
         // can update the status light if it was already open before this page loaded.
         this._broadcastTerminalState();
+        // And announce that this tab is a POS page (drives autodetect green light).
+        this._announcePosPage();
 
         this.port.onMessage.addListener((request) => {
             if (request.action === 'INJECT_INPUT') {
@@ -46,6 +62,9 @@ class POSContentScript {
             }
             if (request.action === 'UPDATE_SCALE_ON_PAGE') {
                 this.updateScaleOnPage(request.data);
+            }
+            if (request.action === 'UPDATE_DISPLAY_ON_PAGE') {
+                this.updateDisplayOnPage(request.data);
             }
             if (request.action === 'NFC_PAYMENT') {
                 this.handleNFCPayment(request.data);
@@ -91,6 +110,7 @@ class POSContentScript {
             // ── SW requests current terminal state (e.g. when side panel connects) ─
             if (request.type === 'REQUEST_TERMINAL_STATE') {
                 this._broadcastTerminalState();
+                this._announcePosPage(); // re-assert POS detection so the light goes green on panel open
             }
         });
 
@@ -99,6 +119,51 @@ class POSContentScript {
             this.port = null;
             setTimeout(() => this.connectToServiceWorker(), 5000);
         });
+    }
+
+    /**
+     * Detect whether this page is a tbay.tk POS and, if so, tell the service
+     * worker so the panel connection indicator can go green automatically —
+     * without the operator having to type a target URL. We're in the isolated
+     * world (can't read window.tbayApp directly), so we detect via stable,
+     * page-set markers readable from the DOM:
+     *   • <html data-tbay-pos> / <body data-tbay-pos>  (explicit marker)
+     *   • <div id="app"> plus a document title containing "tbay"/"POS"   (fallback)
+     */
+    _isPosPage() {
+        try {
+            const de = document.documentElement;
+            if (de && (de.hasAttribute('data-tbay-pos') || de.hasAttribute('data-pos-app'))) return true;
+            if (document.body && document.body.hasAttribute('data-tbay-pos')) return true;
+            const hasApp = !!document.getElementById('app');
+            const title = (document.title || '').toLowerCase();
+            if (hasApp && (title.includes('tbay') || title.includes('pos'))) return true;
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
+    /** Tell the SW this tab is (or isn't) a POS page, so it can drive the light. */
+    _announcePosPage() {
+        if (!this.port) return;
+        const isPos = this._isPosPage();
+        try {
+            this.port.postMessage({
+                type: 'POS_PAGE_DETECTED',
+                isPos,
+                url: window.location.href,
+            });
+        } catch (e) { /* port may have closed */ }
+        // If the POS app mounts slightly after document_idle, re-check shortly.
+        if (!isPos && !this._posRecheckDone) {
+            this._posRecheckDone = true;
+            setTimeout(() => {
+                if (this.port && this._isPosPage()) {
+                    try {
+                        this.port.postMessage({ type: 'POS_PAGE_DETECTED', isPos: true, url: window.location.href });
+                    } catch (e) { /* noop */ }
+                }
+            }, 2500);
+        }
     }
 
     /** Read current terminal settings from localStorage and send to SW. */
@@ -115,6 +180,14 @@ class POSContentScript {
 
     setupWindowListener() {
         window.addEventListener('message', (event) => {
+            // Trust boundary: only accept messages posted by THIS page's own JS,
+            // same-origin, in the top frame. This rejects forged messages from
+            // cross-origin iframes/embedded ads that could otherwise drive the
+            // terminal simulator or spoof the connection state. The manifest
+            // already scopes the content script to the POS origins, but this is
+            // defence-in-depth against in-page third-party frames.
+            if (event.source !== window) return;
+            if (event.origin !== window.location.origin) return;
             if (!event.data || !event.data.type) return;
 
             const t = event.data.type;
@@ -243,6 +316,10 @@ class POSContentScript {
     }
 
     injectKeyboardInput(data) {
+        if (!data || !data.keyData || typeof data.keyData.key !== 'string') {
+            console.error('[CS] KEYBOARD INJECTION FAILED: malformed keyData payload.');
+            return;
+        }
         const targetElement = this.findTargetElement('keyboard') || document.activeElement;
         if (!targetElement || !this.isInputElement(targetElement)) {
             console.error('[CS] KEYBOARD INJECTION FAILED: No suitable target element found.');
@@ -267,12 +344,17 @@ class POSContentScript {
 
         // For printable characters, also update the value
         if (data.keyData.key.length === 1) {
-            const currentPos = targetElement.selectionStart || 0;
             const currentValue = targetElement.value || '';
+            // selectionStart is null on number/email inputs — fall back to end.
+            const currentPos = (targetElement.selectionStart != null)
+                ? targetElement.selectionStart
+                : currentValue.length;
             const newValue = currentValue.slice(0, currentPos) + data.keyData.key + currentValue.slice(currentPos);
-            
+
             targetElement.value = newValue;
-            targetElement.setSelectionRange(currentPos + 1, currentPos + 1);
+            // setSelectionRange throws on input types that don't support selection
+            // (number, email, etc.) — guard it.
+            try { targetElement.setSelectionRange(currentPos + 1, currentPos + 1); } catch (e) { /* unsupported */ }
             this.dispatchInputEvents(targetElement);
         }
     }
@@ -315,6 +397,10 @@ class POSContentScript {
     }
 
     injectNFCInput(data) {
+        if (!data || !data.cardData) {
+            console.error('[CS] NFC INJECTION FAILED: missing cardData payload.');
+            return;
+        }
         // Dispatch NFC tap event for POS systems
         window.dispatchEvent(new CustomEvent('pos-nfc-tap', {
             detail: {
@@ -369,13 +455,24 @@ class POSContentScript {
         // Dispatch all necessary events for framework compatibility
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
-        
-        // For React and other frameworks
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        if (nativeInputValueSetter) {
-            nativeInputValueSetter.call(element, element.value);
+
+        // For React/Vue: invoke the correct prototype value setter for the
+        // element type. Calling the HTMLInputElement setter on a <textarea> or
+        // contentEditable node throws "Illegal invocation" and aborts the final
+        // input event, so the framework may never register the value.
+        try {
+            if (element instanceof HTMLInputElement) {
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                if (setter) setter.call(element, element.value);
+            } else if (element instanceof HTMLTextAreaElement) {
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+                if (setter) setter.call(element, element.value);
+            }
+            // contentEditable: nothing to do — its content was already set directly.
+        } catch (e) {
+            console.warn('[CS] value-setter invocation skipped:', e && e.message);
         }
-        
+
         element.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
@@ -431,6 +528,17 @@ class POSContentScript {
         window.postMessage({
             type: 'UPDATE_SCALE_VARIABLES',
             ...data
+        }, '*');
+    }
+
+    updateDisplayOnPage(data) {
+        // Relay a customer line-display update from the panel into the POS page.
+        // The POS app listens for POS_LINE_DISPLAY_UPDATE (or the interceptor
+        // exposes window.posLineDisplay*) to drive its on-screen display.
+        window.postMessage({
+            type: 'POS_LINE_DISPLAY_UPDATE',
+            line1: data && data.line1 != null ? data.line1 : '',
+            line2: data && data.line2 != null ? data.line2 : '',
         }, '*');
     }
 

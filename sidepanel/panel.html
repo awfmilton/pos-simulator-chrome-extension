@@ -1,9 +1,7 @@
 <!--
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
+tbay.tk Virtual Peripheral Simulator
+Developed by: Alexander Milton — https://tbay.tk
+Version: 2.1.1
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -11,10 +9,8 @@ License: personal use $5/month, business use $100/month
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Peripheral Simulator</title>
-    <!-- tbay.tk Design System Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Fonts are a system stack (see panel.css) — no remote font hosts, to
+         comply with MV3 CSP and avoid transmitting the user's IP to a third party. -->
     <link rel="stylesheet" href="panel.css">
 </head>
 <body>
@@ -405,6 +401,11 @@ License: personal use $5/month, business use $100/month
                         </div>
                     </div>
                 </div>
+
+                <div class="activity-log" id="printer-log">
+                    <h3>Printer Activity</h3>
+                    <div class="log-content"></div>
+                </div>
             </div>
 
             <div class="tab-panel" id="drawer-panel">
@@ -486,6 +487,11 @@ License: personal use $5/month, business use $100/month
                     <label for="weight-slider-input">Quick Weight:</label>
                     <input type="range" id="weight-slider-input" min="0" max="50" step="0.1" value="0">
                 </div>
+
+                <div class="activity-log" id="scale-log">
+                    <h3>Scale Activity</h3>
+                    <div class="log-content"></div>
+                </div>
             </div>
 
             <div class="tab-panel" id="display-panel">
@@ -525,6 +531,11 @@ License: personal use $5/month, business use $100/month
                         <input type="checkbox" id="display-blink">
                         Blinking Text
                     </label>
+                </div>
+
+                <div class="activity-log" id="display-log">
+                    <h3>Display Activity</h3>
+                    <div class="log-content"></div>
                 </div>
             </div>
         </div>
@@ -900,6 +911,8 @@ License: personal use $5/month, business use $100/month
         </div>
     </div>
 
+    <!-- Bundled locally — MV3 forbids remote code; jsPDF powers PDF receipt export. -->
+    <script src="vendor/jspdf.umd.min.js"></script>
     <script src="aamva-generator.js"></script>
     <script src="escpos-parser.js"></script>
     <script src="credit-card-generator.js"></script>

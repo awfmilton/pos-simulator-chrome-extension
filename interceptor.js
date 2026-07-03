@@ -959,7 +959,12 @@ function createBluetoothPrinterDevice(brand, model) {
     return device;
 }
 
-// Enhanced WebBluetooth device enumeration
+// Enhanced WebBluetooth device enumeration.
+// Guard existence first: navigator.bluetooth is undefined on insecure origins,
+// in cross-origin iframes, and where the browser/enterprise policy disables Web
+// Bluetooth. Without this guard, assigning .requestDevice throws a TypeError
+// that aborts the rest of the interceptor IIFE (mirrors the usb/hid/serial guards).
+if (!navigator.bluetooth) navigator.bluetooth = {};
 navigator.bluetooth.requestDevice = async (options) => {
     console.log('[Bluetooth] Printer device requested:', options);
 
@@ -985,6 +990,36 @@ const networkPrinterEndpoints = [
     '/escpos/print'
 ];
 
+// Exact pathnames that mean "open the cash drawer". Matched against
+// URL.pathname (not the whole URL string) so an unrelated product/path
+// merely CONTAINING "cash" or "drawer" is never swallowed.
+const networkDrawerEndpoints = [
+    '/api/drawer.php',
+    '/api/drawer',
+    '/pos/drawer',
+    '/api/cash_drawer.php',
+    '/api/open_drawer.php'
+];
+
+// Decide whether a request URL targets one of our simulated network endpoints.
+// Only same-origin requests to an EXACT known pathname are intercepted — this
+// prevents the override from hijacking unrelated requests whose URL happens to
+// contain a substring like "print", "cash" or "drawer".
+function classifyInterceptTarget(url) {
+    let u;
+    try {
+        u = new URL(url, window.location.href);
+    } catch (e) {
+        return null; // unparseable → never intercept
+    }
+    // Only ever intercept requests to the POS page's own origin.
+    if (u.origin !== window.location.origin) return null;
+    const path = u.pathname;
+    if (networkPrinterEndpoints.some(ep => path === ep || path.endsWith(ep))) return 'printer';
+    if (networkDrawerEndpoints.some(ep => path === ep || path.endsWith(ep))) return 'drawer';
+    return null;
+}
+
 // Network printer protocols
 const networkProtocols = {
     // Raw TCP socket printing (common for network printers)
@@ -1009,10 +1044,10 @@ window.fetch = async function(resource, config = {}) {
         url = resource;
     }
 
-    // Check if this is a printer-related network call
-    const isPrinterCall = networkPrinterEndpoints.some(endpoint => url.includes(endpoint));
+    // Classify by exact same-origin pathname (no loose substring matching).
+    const interceptTarget = classifyInterceptTarget(url);
 
-    if (isPrinterCall) {
+    if (interceptTarget === 'printer') {
         console.log(`[Network] Intercepted printer call to: ${url}`);
         console.log('[Network] Request config:', config);
 
@@ -1069,8 +1104,8 @@ window.fetch = async function(resource, config = {}) {
         }));
     }
 
-        // Check for drawer commands via network
-        if (url.includes('/api/drawer.php') || url.includes('drawer') || url.includes('cash')) {
+        // Check for drawer commands via network (exact same-origin pathname only)
+        if (interceptTarget === 'drawer') {
             console.log(`[Interceptor] Intercepted drawer network call to: ${url}`);
 
             // Send drawer command

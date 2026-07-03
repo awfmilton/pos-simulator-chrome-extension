@@ -594,11 +594,16 @@ class POSSimulatorPanel {
 
         indicator.classList.toggle('connected', connected);
         indicator.classList.toggle('disconnected', !connected);
-        try {
-            text.textContent = connected ? `Connected to ${new URL(url).hostname}` : 'Disconnected';
-        } catch(e) {
+        if (!connected) {
             text.textContent = 'Disconnected';
+            return;
         }
+        // Connected. Show the host if we have a URL; otherwise (autodetect with
+        // no stored target URL) still show "Connected" rather than falling back
+        // to "Disconnected" because new URL(null) threw.
+        let host = '';
+        try { host = url ? new URL(url).hostname : ''; } catch (e) { host = ''; }
+        text.textContent = host ? `Connected to ${host}` : 'Connected';
     }
 
     // Existing methods (handleBarcodeScans, generateTestBarcode, etc.) go here...
@@ -666,55 +671,11 @@ class POSSimulatorPanel {
     }
 
     // MSR Methods
-    async handleMSRSwipe() {
-        const track1Input = document.getElementById('track1-input');
-        const track2Input = document.getElementById('track2-input');
-        const cardTypeSelect = document.getElementById('card-type');
-
-        const track1 = track1Input.value.trim();
-        const track2 = track2Input.value.trim();
-
-        if (!track1 && !track2) {
-            this.showError('Please enter track data or generate test card');
-            return;
-        }
-
-        const swipeData = {
-            track1: track1,
-            track2: track2,
-            cardType: cardTypeSelect.value,
-            timestamp: Date.now()
-        };
-
-        this.updateStatus('Swiping card...');
-
-        try {
-            // NOTE: the service worker's handler case is 'MSR_SWIPE'
-            await this.sendMessage('MSR_SWIPE', swipeData);
-            this.logActivity('msr', `Card swiped: ${cardTypeSelect.value}`);
-            this.updateStatus('Card swiped successfully');
-
-            // Clear inputs after successful swipe
-            track1Input.value = '';
-            track2Input.value = '';
-        } catch (error) {
-            this.showError('Failed to swipe card: ' + error.message);
-        }
-    }
-
-    generateTestCard() {
-        const cardTypeSelect = document.getElementById('card-type');
-        const track1Input = document.getElementById('track1-input');
-        const track2Input = document.getElementById('track2-input');
-
-        const cardType = cardTypeSelect.value;
-        const cardData = this.testData.cards[cardType];
-
-        if (cardData) {
-            track1Input.value = cardData.track1;
-            track2Input.value = cardData.track2;
-        }
-    }
+    // NOTE: handleMSRSwipe() and generateTestCard() were removed — they were dead
+    // code that referenced a #card-type <select> which no longer exists in
+    // panel.html (calling .value on the null lookup threw). The live MSR flow is
+    // handleCardSwipe() (bound to #swipe-btn) and generateCreditCard() (bound to
+    // #generate-card-btn).
 
     // Printer Methods
     async handleTestPrint() {

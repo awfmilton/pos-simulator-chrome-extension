@@ -35,7 +35,9 @@ window.TerminalSimulators.stripe = (function () {
             });
         }
 
-        const isApproved    = outcome === 'approved';
+        // Treat a delayed-capture approval as approved (not a decline) even if
+        // the active brand was switched while this request was pending.
+        const isApproved    = outcome === 'approved' || outcome === 'approved_not_captured';
         const isPartial     = outcome === 'partial_auth';
         const isTimeout     = outcome === 'timeout';
 

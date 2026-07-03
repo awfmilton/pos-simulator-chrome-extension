@@ -1,14 +1,13 @@
 {
   "manifest_version": 3,
   "name": "tbay.tk Virtual Peripheral Simulator",
-  "version": "2.1",
-  "description": "Comprehensive virtual peripheral simulator for Point of Sale system testing. Owned and Distributed by: tbay.tk LLC, MT, 59601. Developed by: Alexander Milton",
+  "version": "2.1.1",
+  "description": "Virtual peripheral simulator for testing the tbay.tk Point of Sale: card terminals, receipt printers, barcode scanners, scales, cash drawers and line displays.",
   "author": "Alexander Milton",
   "permissions": [
     "activeTab",
     "storage",
-    "sidePanel",
-    "scripting"
+    "sidePanel"
   ],
   "background": {
     "service_worker": "service-worker.js"
@@ -19,7 +18,12 @@
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "https://*.tbay.tk/*",
+        "https://tbay.tk/*",
+        "http://localhost/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1/*",
+        "http://127.0.0.1:*/*"
       ],
       "js": [
         "content-script.js"
@@ -30,11 +34,15 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "interceptor.js",
-        "sidepanel/panel.html"
+        "interceptor.js"
       ],
       "matches": [
-        "<all_urls>"
+        "https://*.tbay.tk/*",
+        "https://tbay.tk/*",
+        "http://localhost/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1/*",
+        "http://127.0.0.1:*/*"
       ]
     }
   ],
@@ -54,7 +62,11 @@
     "128": "icons/icon128.png"
   },
   "host_permissions": [
-    "http://*/*",
-    "https://*/*"
+    "https://*.tbay.tk/*",
+    "https://tbay.tk/*",
+    "http://localhost/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1/*",
+    "http://127.0.0.1:*/*"
   ]
 }

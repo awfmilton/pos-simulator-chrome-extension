@@ -49,7 +49,7 @@ window.TerminalSimulators.moneris = (function () {
     function buildPayload(outcome, method, req, partialPercent) {
         const { numStr, uid, amountCents, partialCents } = window.TerminalSimulatorHelpers;
 
-        const isApproved = outcome === 'approved';
+        const isApproved = outcome === 'approved' || outcome === 'approved_not_captured'; // delayed-capture approval is not a decline
         const isPartial  = outcome === 'partial_auth';
         const isTimeout  = outcome === 'timeout';
 
