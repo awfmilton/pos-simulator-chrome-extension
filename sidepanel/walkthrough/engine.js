@@ -125,29 +125,53 @@ class SimTourEngine {
             this.spotlightEl.style.display = 'none';
         }
 
-        // Update Coach Mark
+        // Update Coach Mark — build via explicit DOM construction (no innerHTML;
+        // see extension CLAUDE.md "No innerHTML" convention + MV3 CSP hardening)
         const isLast = this.currentIndex === this.steps.length - 1;
-        this.coachMarkEl.innerHTML = `
-            <div class="tour-header">
-                <h3>${step.title}</h3>
-                <button class="tour-close-btn">&times;</button>
-            </div>
-            <div class="tour-body">
-                ${step.body}
-            </div>
-            <div class="tour-footer">
-                <span class="tour-progress">${this.currentIndex + 1} / ${this.steps.length}</span>
-                <div class="tour-buttons">
-                    <button class="tour-btn tour-prev-btn" ${this.currentIndex === 0 ? 'disabled' : ''}>Back</button>
-                    <button class="tour-btn tour-next-btn">${isLast ? 'Finish' : 'Next'}</button>
-                </div>
-            </div>
-        `;
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'tour-header';
+        const h3 = document.createElement('h3');
+        h3.textContent = step.title;
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'tour-close-btn';
+        closeBtn.textContent = '×';
+        header.appendChild(h3);
+        header.appendChild(closeBtn);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = 'tour-body';
+        body.textContent = step.body;
+
+        // Footer
+        const footer = document.createElement('div');
+        footer.className = 'tour-footer';
+        const progress = document.createElement('span');
+        progress.className = 'tour-progress';
+        progress.textContent = `${this.currentIndex + 1} / ${this.steps.length}`;
+        const buttons = document.createElement('div');
+        buttons.className = 'tour-buttons';
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'tour-btn tour-prev-btn';
+        prevBtn.textContent = 'Back';
+        prevBtn.disabled = this.currentIndex === 0;
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'tour-btn tour-next-btn';
+        nextBtn.textContent = isLast ? 'Finish' : 'Next';
+        buttons.appendChild(prevBtn);
+        buttons.appendChild(nextBtn);
+        footer.appendChild(progress);
+        footer.appendChild(buttons);
+
+        // Mount (clears any previous content, then appends fresh nodes)
+        this.coachMarkEl.replaceChildren(header, body, footer);
 
         // Wire buttons
-        this.coachMarkEl.querySelector('.tour-close-btn').onclick = () => this.stop();
-        this.coachMarkEl.querySelector('.tour-prev-btn').onclick = () => this.prev();
-        this.coachMarkEl.querySelector('.tour-next-btn').onclick = () => this.next();
+        closeBtn.onclick = () => this.stop();
+        prevBtn.onclick = () => this.prev();
+        nextBtn.onclick = () => this.next();
 
         // Position Coach Mark
         this._positionCoachMark(targetEl, step.placement);
