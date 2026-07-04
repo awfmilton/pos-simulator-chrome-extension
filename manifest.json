@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "tbay.tk Virtual Peripheral Simulator",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Virtual peripheral simulator for testing the tbay.tk Point of Sale: card terminals, receipt printers, barcode scanners, scales, cash drawers and line displays.",
   "author": "Alexander Milton",
   "permissions": [

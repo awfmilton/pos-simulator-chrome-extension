@@ -12,6 +12,7 @@ Version: 2.1.1
     <!-- Fonts are a system stack (see panel.css) — no remote font hosts, to
          comply with MV3 CSP and avoid transmitting the user's IP to a third party. -->
     <link rel="stylesheet" href="panel.css">
+    <link rel="stylesheet" href="walkthrough/walkthrough.css">
 </head>
 <body>
     <div class="simulator-container">
@@ -798,6 +799,7 @@ Version: 2.1.1
                 <span id="connection-status-text">Disconnected</span>
             </div>
             <div class="global-controls">
+                <button id="start-tour-btn" class="secondary-btn">✨ Take Tour</button>
                 <button id="reset-all-btn" class="danger-btn">🔄 Reset All</button>
                 <button id="settings-btn" class="secondary-btn">⚙️ Settings</button>
             </div>
@@ -931,6 +933,12 @@ Version: 2.1.1
     <script src="simulators/chase.js"></script>
     <script src="simulators/paypal.js"></script>
     <script src="payment-terminal-simulator.js"></script>
+    <!-- Walkthrough system -->
+    <script src="walkthrough/types.js"></script>
+    <script src="walkthrough/registry.js"></script>
+    <script src="walkthrough/context.js"></script>
+    <script src="walkthrough/engine.js"></script>
+    <script src="walkthrough/steps.js"></script>
     <script src="panel.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 {
   "name": "pos-peripheral-simulator",
-  "version": "2.1.0",
+  "version": "2.1.2",
   "description": "Virtual POS Peripheral Simulator",
   "scripts": {
     "test": "jest"
