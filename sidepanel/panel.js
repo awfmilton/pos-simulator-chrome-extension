@@ -166,6 +166,11 @@ class POSSimulatorPanel {
             this.showSettings();
         });
 
+        document.getElementById('start-tour-btn').addEventListener('click', () => {
+            dlog('[USER-ACTION] Clicked "Take Tour"');
+            this.startFullTour();
+        });
+
         // Settings modal
         document.getElementById('close-settings-btn').addEventListener('click', () => {
             dlog('[USER-ACTION] Clicked "Close Settings"');
@@ -1638,6 +1643,15 @@ class POSSimulatorPanel {
         } catch (error) {
             console.error('Test email failed:', error);
             this.updateStatus('Test email failed: ' + error.message, 'error');
+        }
+    }
+
+    startFullTour() {
+        if (window.simTourEngine && window.simTourRegistry) {
+            const allSteps = window.simTourRegistry.getFullTourSteps();
+            window.simTourEngine.start(allSteps);
+        } else {
+            console.error('[PANEL] Tour system not loaded');
         }
     }
 
