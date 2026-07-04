@@ -141,6 +141,16 @@ class PeripheralSimulatorService {
                 this.checkConnection(); // re-evaluate the light immediately
                 return;
             }
+            // ── POS Walkthrough Coordination (Cross-App Tour) ────────────────
+            // Relay POS tour messages from content script to the side panel.
+            if (msg.source === 'pos-tour') {
+                if (this.sidePanelPort) {
+                    dlog('[SW] Relaying POS tour message to side panel:', msg);
+                    this.sidePanelPort.postMessage(msg);
+                }
+                return;
+            }
+
             // Route print/hardware data through handleRawData()
             if (msg.type === 'POS_SIMULATOR_RAW_DATA' || msg.type === 'RAW_DATA_FROM_PAGE') {
                 dlog(`[SW] Received hardware data from content script (type: ${msg.type}, deviceType: ${msg.deviceType}, source: ${msg.source}). Routing through handleRawData().`);

@@ -204,6 +204,29 @@ class POSContentScript {
                 }
             }
 
+            // ── POS Walkthrough Coordination (Cross-App Tour) ────────────────
+            // The POS app broadcasts its tour lifecycle events. We listen for
+            // "pos-tour" source and relay them to the side panel.
+            if (event.source === window && event.data && event.data.source === 'pos-tour' && event.data.protocolVersion === 1) {
+                dlog('[CS] Received POS tour message:', event.data);
+
+                // 1. Handshake ACK: if it's a hello, immediately reply so the POS knows we're here.
+                if (event.data.type === 'TOUR_SYNC' && event.data.event === 'hello') {
+                    dlog('[CS] Sending POS tour handshake ACK');
+                    window.postMessage({
+                        source: 'ext-tour',
+                        protocolVersion: 1,
+                        type: 'TOUR_SYNC',
+                        event: 'ack'
+                    }, '*');
+                }
+
+                // 2. Relay: send the message to the service worker (relayed to panel)
+                if (this.port) {
+                    this.port.postMessage(event.data);
+                }
+            }
+
             // ── Terminal Bridge: forward charge requests to the extension ────
             // TerminalBridge.js posts POS_TERMINAL_CHARGE_REQUEST to window.
             // We forward it to the service worker, which relays it to the panel.

@@ -60,6 +60,41 @@ class SimTourEngine {
         this.coachMarkEl = null;
     }
 
+    /**
+     * Show a single highlight step without full tour navigation.
+     * Used for cross-app coordination where the POS drives the walkthrough.
+     */
+    async showAdHocStep(step) {
+        // Stop any active standalone tour
+        if (this.isActive) this.stop();
+
+        this._initUI();
+        this.currentIndex = 0;
+        this.steps = [step];
+
+        // Ensure target exists before showing
+        const targetEl = step.target ? document.querySelector(step.target) : null;
+
+        // Add ad-hoc styling (pulse highlight)
+        if (this.spotlightEl) {
+            this.spotlightEl.classList.add('tour-spotlight-pulse');
+        }
+
+        this._updateUI();
+
+        // Hide navigation buttons for ad-hoc steps
+        const footer = this.coachMarkEl.querySelector('.tour-footer');
+        if (footer) footer.style.display = 'none';
+        const closeBtn = this.coachMarkEl.querySelector('.tour-close-btn');
+        if (closeBtn) {
+            // Re-wire close button to also remove ad-hoc styling
+            closeBtn.onclick = () => {
+                this.stop();
+                if (this.spotlightEl) this.spotlightEl.classList.remove('tour-spotlight-pulse');
+            };
+        }
+    }
+
     _initUI() {
         // Overlay for spotlight (using box-shadow trick)
         this.overlayEl = document.createElement('div');

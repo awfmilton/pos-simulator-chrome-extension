@@ -346,6 +346,12 @@ class POSSimulatorPanel {
         document.getElementById('cancel-email-config-btn').addEventListener('click', () => {
             this.hideEmailConfig();
         });
+
+        // Tour Sync Stop Button
+        document.getElementById('stop-tour-sync-btn').addEventListener('click', () => {
+            dlog('[USER-ACTION] Clicked "Stop" on tour sync banner');
+            this.handleTourEvent({ source: 'pos-tour', event: 'tour-ended' });
+        });
     }
 
 
@@ -402,6 +408,10 @@ class POSSimulatorPanel {
                 if (!msg.data.connected && typeof window.handleTerminalReadySignal === 'function') {
                     window.handleTerminalReadySignal({ enabled: false, brand: null, debug: false, terminalIp: null });
                 }
+                // Also end any active tour sync if the page disconnects
+                if (!msg.data.connected) {
+                    this.handleTourEvent({ source: 'pos-tour', event: 'tour-ended' });
+                }
                 break;
             case 'PRINT_DATA_RECEIVED':
                 // Pass brand to the handler for correct parsing
@@ -421,6 +431,12 @@ class POSSimulatorPanel {
                 break;
             case 'POS_SIMULATOR_DISPLAY_UPDATE':
                 this.updateLineDisplayFromPOS(msg);
+                break;
+            case 'TOUR_EVENT':
+            case 'TOUR_SYNC':
+                if (msg.source === 'pos-tour') {
+                    this.handleTourEvent(msg);
+                }
                 break;
             // ── Payment terminal simulator ──────────────────────────
             case 'TERMINAL_CHARGE_REQUEST':
@@ -1652,6 +1668,73 @@ class POSSimulatorPanel {
             window.simTourEngine.start(allSteps);
         } else {
             console.error('[PANEL] Tour system not loaded');
+        }
+    }
+
+    /**
+     * React to POS tour lifecycle events.
+     * Coordination protocol source: "pos-tour", version: 1.
+     */
+    handleTourEvent(msg) {
+        if (!msg || !msg.event) return;
+        dlog('[TOUR-SYNC] Handling tour event:', msg.event, msg.payload);
+
+        const banner = document.getElementById('tour-sync-banner');
+
+        switch (msg.event) {
+            case 'tour-started':
+                // Enter follow mode
+                if (banner) banner.style.display = 'block';
+                // Pause standalone autoplay so they don't fight
+                if (window.simTourEngine && window.simTourEngine.isActive) {
+                    window.simTourEngine.stop();
+                }
+                break;
+
+            case 'age-gate-reached':
+                // 1. Highlight the scanner
+                this.switchTab('scanner');
+                if (window.simTourEngine) {
+                    window.simTourEngine.showAdHocStep({
+                        target: '#scanner-panel h2',
+                        title: 'POS Age-Gate Reached',
+                        body: 'The POS needs an ID scan. Generating and injecting a simulated AAMVA ID...',
+                        placement: 'bottom'
+                    });
+                }
+                // 2. Feed a simulated ID scan back to the POS
+                const idBarcode = this.aamvaGenerator.generateIDCard();
+                dlog('[TOUR-SYNC] Injecting simulated ID scan for age-gate:', idBarcode);
+                this.sendMessage('SCAN_BARCODE', {
+                    barcode: idBarcode,
+                    format: 'aamva-pdf417',
+                    simulateEnter: true
+                });
+                break;
+
+            case 'demo-transaction-complete':
+                // Highlight the receipt / printer area
+                this.switchTab('printer');
+                if (window.simTourEngine) {
+                    window.simTourEngine.showAdHocStep({
+                        target: '#receipt-display',
+                        title: 'Transaction Complete',
+                        body: 'The POS has finished the demo transaction. The receipt is displayed here.',
+                        placement: 'top'
+                    });
+                }
+                break;
+
+            case 'tour-ended':
+                // Exit follow mode
+                if (banner) banner.style.display = 'none';
+                if (window.simTourEngine) {
+                    window.simTourEngine.stop();
+                }
+                break;
+
+            default:
+                dlog('[TOUR-SYNC] Unhandled tour event:', msg.event);
         }
     }
 
