@@ -1,7 +1,7 @@
 /*
  * payment-terminal-simulator.js
  * ─────────────────────────────
- * Owned and Distributed by: tbay.tk LLC, MT, 59601
+ * Copyright (c) Alexander Milton
  * Developed by: Alexander Milton
  *
  * Module: Payment Terminal Simulator

@@ -1,9 +1,9 @@
 /*
-Owned and Distributed by: tbay.tk LLC, MT, 59601
+Copyright (c) Alexander Milton
 Developed by: Alexander Milton
 Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
+Website: https://github.com/awfmilton/pos-simulator-chrome-extension
+License: MPL-2.0 (https://mozilla.org/MPL/2.0/)
 */
 // content-script.js
 

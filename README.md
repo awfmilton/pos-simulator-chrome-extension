@@ -251,13 +251,24 @@ The extension can be extended with additional peripherals by:
 3. Adding message handlers in `service-worker.js`
 4. Creating content script integration as needed
 
+## Roadmap
+
+Planned upcoming features and enhancements (~25+ hours of work):
+
+1. **Verifone & Ingenico Cloud Terminal Simulators (~8 hours)**
+   - Add Verifone Point / P400 and Ingenico Lane / Link 2500 brand simulator modules under `sidepanel/simulators/`.
+   - Support split-tender partial authorizations, EMV chip fallback flows, and contactless tap limits.
+2. **OPOS / JavaPOS WebSocket Bridge Mode (~6 hours)**
+   - Optional local WebSocket relay mode to test legacy POS frontends that communicate with local OPOS/JavaPOS device services rather than WebUSB/WebSerial.
+3. **Programmable Barcode & MSR Batch Macro Runner (~6 hours)**
+   - Record and replay timed sequences of barcode scans, scale weight readings, and card swipes for automated checkout regression testing.
+4. **StarPRNT & ZPL Label Printer Emulation (~5 hours)**
+   - Extend `escpos-parser.js` with Star Line Mode and Zebra ZPL II label rendering for pharmacy, deli scale, and shipping label workflows.
+
 ## License
 
-Owned and Distributed by: tbay.tk LLC, MT, 59601
-Developed by: Alexander Milton
-Version: 2.1
-Website: https://tbay.tk
-License: personal use $5/month, business use $100/month
+Mozilla Public License 2.0 (MPL-2.0).
+Copyright (c) Alexander Milton (<awfmilton@gmail.com>). See [LICENSE](LICENSE).
 
 ## Support
 
