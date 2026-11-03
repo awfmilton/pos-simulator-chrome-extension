@@ -253,17 +253,17 @@ The extension can be extended with additional peripherals by:
 
 ## Roadmap
 
-Planned upcoming features and enhancements (~25+ hours of work):
+See **[ROADMAP.md](ROADMAP.md)** for the complete upcoming engineering plan (~64 hours), including:
 
-1. **Verifone & Ingenico Cloud Terminal Simulators (~8 hours)**
-   - Add Verifone Point / P400 and Ingenico Lane / Link 2500 brand simulator modules under `sidepanel/simulators/`.
-   - Support split-tender partial authorizations, EMV chip fallback flows, and contactless tap limits.
-2. **OPOS / JavaPOS WebSocket Bridge Mode (~6 hours)**
-   - Optional local WebSocket relay mode to test legacy POS frontends that communicate with local OPOS/JavaPOS device services rather than WebUSB/WebSerial.
-3. **Programmable Barcode & MSR Batch Macro Runner (~6 hours)**
-   - Record and replay timed sequences of barcode scans, scale weight readings, and card swipes for automated checkout regression testing.
-4. **StarPRNT & ZPL Label Printer Emulation (~5 hours)**
-   - Extend `escpos-parser.js` with Star Line Mode and Zebra ZPL II label rendering for pharmacy, deli scale, and shipping label workflows.
+1. **Pro Subscriptions & Supporter Donations (~10 hours)**
+   - Stripe Checkout & license activation portal for Pro Tier subscriptions alongside one-time and recurring supporter donations.
+2. **Complete Mocked / Inert Hardware & Receipt Paths (~14 hours)**
+   - Real email receipt relay replacing the mock stub in `service-worker.js`, SVG/Canvas barcode rendering in `escpos-parser.js`, and Verifone / Ingenico / Square / Clover / PAX / Adyen sandbox simulators.
+3. **Programmable Batch Macro Runner & OPOS/JavaPOS Bridge (~10 hours)**
+   - Record and replay timed sequences of barcode scans, scale weights, and card swipes, plus a local WebSocket OPOS/JavaPOS relay.
+4. **Multilingual Support (`_locales/` Chrome i18n) (~8 hours)**
+   - Full `chrome.i18n` localization (`en`, `es`, `fr`, `de`, `pt_BR`, `ja`) and thermal printer character codepages.
+5. **Security Review, MV3 Lifecycle Infrastructure Review, and GitHub Actions / Automated Testing Expansion (~22 hours)**
 
 ## License
 
